@@ -1,2 +1,6 @@
+vector_venv/
 .env
-.pdf
+__pycache__/
+*.pyc
+data/*.pdf
+.DS_Store
