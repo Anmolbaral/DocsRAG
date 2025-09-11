@@ -1,12 +1,24 @@
 from modules.rag import RAGPipeline
 from modules.loader import load_pdf
 
-import os
+import os, json
+
 allFiles = os.listdir("data")
 allTexts = []
+fileMetadata = []
 for file in allFiles:
-	docs = load_pdf("data/" + file)
+	fileName = "data/" + file
+	docs = load_pdf(fileName)
+	fileMetadata.append({
+		"fileName": fileName,
+		"fileSize": os.path.getsize(fileName),
+		"fileModifiedTime": os.path.getmtime(fileName),
+		"fileContent": docs
+	})
 	allTexts.extend(docs)
+	with open("cache/file_metadata.json", "w") as f:
+		json.dump(fileMetadata, f, indent=4)
+
 rag = RAGPipeline(allTexts)
 
 while True:

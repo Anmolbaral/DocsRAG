@@ -1,25 +1,32 @@
 from pypdf import PdfReader
-import re
+import re, os
 
 
 def load_pdf(path):
-	reader = PdfReader(path)
-	all_chunks= []
-	for pageNum, page in enumerate(reader.pages):
-		text = page.extract_text()
-		if text:
-			chunkTexts = create_overlap_chunks(text, chunkSize=5, overlap=2)
-			for chunkText in chunkTexts:
-				chunkObject = {
-					"text": chunkText,
-					"metadata": {
-						"page": pageNum+1,
-						"path": path,
-						"section": path.split("/")[-1]
+	try:
+		if os.path.getsize(path) == 0:
+			print(f"File {path} is empty")
+			return []
+		reader = PdfReader(path)
+		all_chunks= []
+		for pageNum, page in enumerate(reader.pages):
+			text = page.extract_text()
+			if text:
+				chunkTexts = create_overlap_chunks(text, chunkSize=5, overlap=2)
+				for chunkText in chunkTexts:
+					chunkObject = {
+						"text": chunkText,
+						"metadata": {
+							"page": pageNum+1,
+							"path": path,
+							"section": path.split("/")[-1]
+						}
 					}
-				}
-				all_chunks.append(chunkObject)
-	return all_chunks
+					all_chunks.append(chunkObject)
+		return all_chunks
+	except Exception as e:
+		print(f"Error loading file {path}: {e}")
+		return []
 
 # splitting larger files into chunks of sentences
 def split_into_sentences(text):
