@@ -6,11 +6,9 @@ openai.api_key = os.getenv("OPENAI_API_KEY")
 class RAGPipeline:
 	def __init__(self, chunks):
 		self.db = VectorDB(dim=1536)
-		self.chunks = chunks
-		self.chunkCount = len(chunks)
 		self.texts = [chunk["text"] for chunk in chunks]
+		self.chunks = chunks
 		self.embeddings = get_embeddings(self.texts)
-
 		for i, t in enumerate(chunks):
 			self.db.add(self.embeddings[i], t["text"], t["metadata"])
 		self.add_to_cache()
@@ -23,10 +21,11 @@ class RAGPipeline:
 
 		obj = cls.__new__(cls)
 		obj.db = VectorDB(dim=1536)
-		obj.texts = metadata["texts"]
+		obj.chunks = metadata["chunks"]
 		obj.embeddings = metadata["embeddings"]
-		for i, t in enumerate(obj.texts):
-			obj.db.add(obj.embeddings[i], t, {"chunkId":i})
+		# obj.texts = [chunk["text"] for chunk in obj.chunks]
+		for i, chunk in enumerate(obj.chunks):
+			obj.db.add(obj.embeddings[i], chunk["text"], chunk["metadata"])
 		return obj
 	
 	
@@ -45,12 +44,11 @@ class RAGPipeline:
 		return response.choices[0].message.content
 	
 	def add_to_cache(self):
-		metadata = {
-			"chunkCount": self.chunkCount,
-			"texts": self.texts,
-			"embeddings": self.embeddings
+		cacheData= {
+			"chunks": self.chunks,
+			"embeddings":self.embeddings,
 		}
 		with open("cache/embeddings.json", "w") as f:
-			json.dump(metadata, f, indent=4)
+			json.dump(cacheData, f, indent=2)
 			
 
