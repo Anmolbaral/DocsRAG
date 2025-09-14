@@ -1,46 +1,32 @@
 from modules.rag import RAGPipeline
 from modules.loader import load_pdf
 from modules.hashing import get_file_hash
-
 import os, json
 
-allFiles = os.listdir("data")
-allTexts = []
-fileMetadata = {}
 
-# Check if the file metadata is valid
-# No need to make a new embedding cache if the file metadata is valid
-def cache_is_valid():
-	try:
-		if os.path.getsize("cache/file_metadata.json") == 0:
-			return False
+class DocumentRAGSystem:
+	def __init__(self):
+		self.ragPipeline = None
+		self.cacheDir = "cache"
+		self.allFiles = os.listdir("data")
 
-		with open("cache/file_metadata.json", "r") as f:
-			cacheMetadata = json.load(f)			
-		
-		for file in allFiles:
-			filePath = f"data/{file}"
+	def initialize(self):
+		"""Initiializing RAGPipeline once at startup"""
 
-			if file not in cacheMetadata.keys() or get_file_hash(filePath) != cacheMetadata[file]["fileHash"]:
-				return False
+		if self.cache_is_valid():
+			print("Using cached embeddings")
+			self.ragPipeline = RAGPipeline.from_cache()
+		else:
+			print("Using new embeddings")
+			self.ragPipeline = self.data_pipeline()
 
-		return True
-	except Exception as e:
-		print(f"Error checking cache: {e}")
-		return False
+	
+	def data_pipeline(self):
+		"""Processing all files in the data directory"""
+		allTexts = []
+		fileMetadata = {}
 
-while True:
-	query = input("Ask a question or type 'exit' to quit: ")
-
-	if query == "exit":
-		break
-	#if file metadata is invalid, we make a new embedding cache
-	if cache_is_valid():
-		print("Using cached embeddings")
-		rag = RAGPipeline.from_cache()
-	else:
-		print("Using new embeddings")
-		for file in allFiles:
+		for file in self.allFiles:
 			fileLoc = "data/" + file
 			docs = load_pdf(fileLoc)
 			fileMetadata[file] = ({
@@ -50,8 +36,45 @@ while True:
 			})
 			allTexts.extend(docs)
 		with open("cache/file_metadata.json", "w") as f:
-			json.dump(fileMetadata, f, indent=4)
-		rag = RAGPipeline(allTexts)
+			json.dump(fileMetadata, f, indent=2)
+		return RAGPipeline(allTexts)
 	
-	answer = rag.ask(query)
-	print("Answer: ", answer)
+	def user_interaction(self):
+		while True:
+			try:
+				query = input("Ask a question or type 'exit' to quit: ")
+				if query == "exit":
+					return
+				answer = self.ragPipeline.ask(query)
+				print("Answer: ", answer)
+
+			except Exception as e:
+				print(f"Error answering query: {e}")
+		return
+
+	"""Check if the file metadata is valid"""
+	"""No need to make a new embedding cache if the file metadata is valid"""
+	def cache_is_valid(self):
+		try:
+			if os.path.getsize("cache/file_metadata.json") == 0:
+				return False
+
+			with open("cache/file_metadata.json", "r") as f:
+				cacheMetadata = json.load(f)			
+			
+			for file in self.allFiles:
+				filePath = f"data/{file}"
+
+				if file not in cacheMetadata.keys() or get_file_hash(filePath) != cacheMetadata[file]["fileHash"]:
+					return False
+
+			return True
+		except Exception as e:
+			print(f"Error checking cache: {e}")
+			return False
+
+
+if __name__ == "__main__":
+	system = DocumentRAGSystem()
+	system.initialize()
+	system.user_interaction()
