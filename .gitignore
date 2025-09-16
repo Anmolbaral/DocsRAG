@@ -6,3 +6,5 @@ data/*.pdf
 !data/sample.pdf
 .DS_Store*.dylib
 cache/
+todo.txt
+config.yaml

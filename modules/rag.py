@@ -23,7 +23,6 @@ class RAGPipeline:
 		obj.db = VectorDB(dim=1536)
 		obj.chunks = metadata["chunks"]
 		obj.embeddings = metadata["embeddings"]
-		# obj.texts = [chunk["text"] for chunk in obj.chunks]
 		for i, chunk in enumerate(obj.chunks):
 			obj.db.add(obj.embeddings[i], chunk["text"], chunk["metadata"])
 		return obj

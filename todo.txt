@@ -4,20 +4,6 @@ If len(sentences) is very small (like 1–2), this might create tiny chunks → 
 
 
 
-
-# RAG System Code Analysis & Improvement Recommendations
-
-
-Your RAG system is well-structured with a modular design, but there are several areas for improvement. Here's my comprehensive analysis:
-
-## 🚨 **Critical Issues in `main.py`**
-
-### 1. **Architecture Problems**
-- **Inefficient Cache Logic**: Cache validation runs on every query instead of at startup
-- **Resource Waste**: RAG pipeline recreated unnecessarily when cache is invalid
-- **Global State**: Using global variables (`allFiles`, `allTexts`, `fileMetadata`) creates tight coupling
-- **No Error Recovery**: System crashes on any file processing error
-
 ### 2. **Performance Issues**
 - **Blocking I/O**: File operations block the main thread
 - **Memory Inefficiency**: Loading all texts into memory even when using cache

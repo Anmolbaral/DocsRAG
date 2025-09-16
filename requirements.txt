@@ -3,3 +3,4 @@ openai
 numpy
 python-dotenv	
 pypdf
+tenacity

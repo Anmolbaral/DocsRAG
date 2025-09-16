@@ -26,18 +26,22 @@ class DocumentRAGSystem:
 		allTexts = []
 		fileMetadata = {}
 
-		for file in self.allFiles:
-			fileLoc = "data/" + file
-			docs = load_pdf(fileLoc)
-			fileMetadata[file] = ({
-				"fileSize": os.path.getsize(fileLoc),
-				"fileModifiedTime": os.path.getmtime(fileLoc),
-				"fileHash": get_file_hash(fileLoc),
-			})
-			allTexts.extend(docs)
-		with open("cache/file_metadata.json", "w") as f:
-			json.dump(fileMetadata, f, indent=2)
-		return RAGPipeline(allTexts)
+		try:
+			for file in self.allFiles:
+				fileLoc = "data/" + file
+				docs = load_pdf(fileLoc)
+				fileMetadata[file] = ({
+					"fileSize": os.path.getsize(fileLoc),
+					"fileModifiedTime": os.path.getmtime(fileLoc),
+					"fileHash": get_file_hash(fileLoc),
+				})
+				allTexts.extend(docs)
+			with open("cache/file_metadata.json", "w") as f:
+				json.dump(fileMetadata, f, indent=2)
+			return RAGPipeline(allTexts)
+		except Exception as e:
+			print(f"Error processing files: {e}")
+			raise e
 	
 	def user_interaction(self):
 		while True:
@@ -76,5 +80,8 @@ class DocumentRAGSystem:
 
 if __name__ == "__main__":
 	system = DocumentRAGSystem()
-	system.initialize()
-	system.user_interaction()
+	try:		
+		system.initialize()
+		system.user_interaction()
+	except Exception as e:
+		print(f"System Initialization Error: {e}")
