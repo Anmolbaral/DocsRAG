@@ -12,6 +12,10 @@ class RAGPipeline:
 		for i, t in enumerate(chunks):
 			self.db.add(self.embeddings[i], t["text"], t["metadata"])
 		self.add_to_cache()
+
+		#Adding conversation memory
+		self.conversationHistory = []
+		self.maxHistory = 10
 	
 
 	@classmethod
@@ -23,6 +27,11 @@ class RAGPipeline:
 		obj.db = VectorDB(dim=1536)
 		obj.chunks = metadata["chunks"]
 		obj.embeddings = metadata["embeddings"]
+
+		# Intializing conversation history
+		obj.conversationHistory = []
+		obj.maxHistory = 10
+
 		for i, chunk in enumerate(obj.chunks):
 			obj.db.add(obj.embeddings[i], chunk["text"], chunk["metadata"])
 		return obj
@@ -34,14 +43,31 @@ class RAGPipeline:
 		contextParts = []
 		for result in results:
 			contextParts.append(f"Page {result['metadata']['page']} - {result['metadata']['section']}: {result['text']}")
-		context = "\n".join(contextParts)	
-		prompt = f"Answer using this context: {context}\n\nQuestion: {query}"
+		context = "\n".join(contextParts)
+		messages = self.build_converation_context(context)
+		messages.append({"role": "user", "content": query})
 		response = openai.chat.completions.create(
 			model = "gpt-4o-mini",
-			messages = [{"role": "user", "content": prompt}]
+			messages = messages
 		)
+		self.add_to_conversation_history(query, response.choices[0].message.content)
 		return response.choices[0].message.content
 	
+	def build_converation_context(self, documentContext):
+		conversationContext = []
+		conversationContext.append({'role': 'system', 'content': f'You are a helpful assistant that can answer questions about the context provided. USe conversation history to understant the references and context'})
+		conversationContext.append({'role':'user', 'content': f'Document Context: {documentContext}'})
+		if self.conversationHistory:
+			for conversation in self.conversationHistory:
+				conversationContext.append(conversation["user"])
+				conversationContext.append(conversation["assistant"])
+		return conversationContext
+
+	def add_to_conversation_history(self, query, response):
+		self.conversationHistory.append({"user":{"role": "user", "content": query}, "assistant":{'role':'assistant', 'content':response}})
+		if len(self.conversationHistory) > self.maxHistory:
+			self.conversationHistory.pop(0)
+
 	def add_to_cache(self):
 		cacheData= {
 			"chunks": self.chunks,
