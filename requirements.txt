@@ -4,3 +4,7 @@ numpy
 python-dotenv	
 pypdf
 tenacity
+ragas
+langsmith
+langchain
+langchain-openai
