@@ -1,5 +1,3 @@
-from modules.rag import RAGPipeline
-
 from datasets import Dataset
 testDataset = [
     {

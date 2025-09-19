@@ -1,0 +1,17 @@
+LICENSE
+README.md
+pyproject.toml
+src/vector_embedding/__init__.py
+src/vector_embedding/main.py
+src/vector_embedding.egg-info/PKG-INFO
+src/vector_embedding.egg-info/SOURCES.txt
+src/vector_embedding.egg-info/dependency_links.txt
+src/vector_embedding.egg-info/requires.txt
+src/vector_embedding.egg-info/top_level.txt
+src/vector_embedding/modules/embeddings.py
+src/vector_embedding/modules/hashing.py
+src/vector_embedding/modules/loader.py
+src/vector_embedding/modules/rag.py
+src/vector_embedding/modules/vectordb.py
+test/test_current_system.py
+test/test_dataset.py

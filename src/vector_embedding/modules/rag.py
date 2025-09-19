@@ -1,5 +1,5 @@
-from modules.embeddings import get_embedding, get_embeddings
-from modules.vectordb import VectorDB
+from .embeddings import get_embedding, get_embeddings
+from .vectordb import VectorDB
 import openai, os, json
 openai.api_key = os.getenv("OPENAI_API_KEY")
 

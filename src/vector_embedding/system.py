@@ -1,8 +1,7 @@
-from modules.rag import RAGPipeline
-from modules.loader import load_pdf
-from modules.hashing import get_file_hash
+from .modules.rag import RAGPipeline
+from .modules.loader import load_pdf
+from .modules.hashing import get_file_hash
 import os, json
-
 
 class DocumentRAGSystem:
 	def __init__(self):
@@ -76,12 +75,3 @@ class DocumentRAGSystem:
 		except Exception as e:
 			print(f"Error checking cache: {e}")
 			return False
-
-
-if __name__ == "__main__":
-	system = DocumentRAGSystem()
-	try:		
-		system.initialize()
-		system.user_interaction()
-	except Exception as e:
-		print(f"System Initialization Error: {e}")

@@ -1,3 +1,23 @@
+Metadata-Version: 2.4
+Name: vector-embedding
+Version: 0.1.0
+Summary: Personal Document RAG System
+Author: Your Name
+Requires-Python: >=3.9
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: faiss-cpu
+Requires-Dist: openai
+Requires-Dist: numpy
+Requires-Dist: python-dotenv
+Requires-Dist: pypdf
+Requires-Dist: tenacity
+Requires-Dist: ragas
+Requires-Dist: langsmith
+Requires-Dist: langchain
+Requires-Dist: langchain-openai
+Dynamic: license-file
+
 # Personal Document RAG System
 
 A Retrieval-Augmented Generation (RAG) system built with Python that enables intelligent question-answering over personal documents using OpenAI embeddings and FAISS vector search.
