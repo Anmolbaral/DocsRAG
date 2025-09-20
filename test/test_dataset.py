@@ -3,29 +3,29 @@ testDataset = [
     {
         "question": "What is Anmol's work experience?",
         "contexts": [
-            "Anmol worked at Apple as an Engineering Intern, focusing on iOS development and machine learning projects. He was there for 3 months during the summer.",
-            "During his time at Apple, he worked on user experience improvements and backend optimization."
+            "Anmol worked as an intern at Karkhana, where he was selected from a competitive pool of 65 applicants. During his time at Karkhana, he demonstrated a strong curiosity in robotics and took on the role of project lead in various robotics events.",
+            "At Apple, Anmol worked as an Engineering Intern from May 2024 to August 2024. During his internship, he developed and optimized system software for AirPods across multiple development platforms, applying Test-Driven Development (TDD) principles."
         ],
-        "answer": "Anmol worked at Apple as an Engineering Intern, focusing on airpod's features development for 3 months during the summer.",
-        "ground_truth": "Anmol worked at Apple as an Engineering Intern, focusing on airpod's features development for 3 months during the summer."
+        "answer": "Anmol's work experience includes being an intern at Karkhana, where he was selected from a competitive pool of 65 applicants and took on project lead roles in robotics events. He also worked as an Engineering Intern at Apple from May 2024 to August 2024, developing and optimizing system software for AirPods.",
+        "ground_truth": "Anmol's work experience includes being an intern at Karkhana, where he was selected from a competitive pool of 65 applicants and took on project lead roles in robotics events. He also worked as an Engineering Intern at Apple from May 2024 to August 2024, developing and optimizing system software for AirPods."
     },
     {
         "question": "What did he do at Apple?",
         "contexts": [
-            "At Apple, he worked on iOS development and machine learning projects, focusing on user experience improvements and backend optimization.",
-            "He contributed to several features and CI/CD pipelines."
+            "At Apple, Anmol worked as an Engineering Intern from May 2024 to August 2024. During his internship, he developed and optimized system software for AirPods across multiple development platforms, applying Test-Driven Development (TDD) principles.",
+            "Additionally, he identified and resolved a critical CI/CD pipeline bug that bottlenecked over 200 engineers, which reduced build times by 5% and improved team efficiency. He also coordinated with over five cross-functional teams to align on feature updates and ensure timely delivery of software releases."
         ],
-        "answer": "At Apple, he worked on iOS development and machine learning projects, focusing on user experience improvements and backend optimization.",
-        "ground_truth": "At Apple, he worked on iOS development and machine learning projects, focusing on user experience improvements and backend optimization."
+        "answer": "At Apple, Anmol worked as an Engineering Intern from May 2024 to August 2024. During his internship, he developed and optimized system software for AirPods across multiple development platforms, applying Test-Driven Development (TDD) principles. Additionally, he identified and resolved a critical CI/CD pipeline bug that bottlenecked over 200 engineers, which reduced build times by 5% and improved team efficiency.",
+        "ground_truth": "At Apple, Anmol worked as an Engineering Intern from May 2024 to August 2024. During his internship, he developed and optimized system software for AirPods across multiple development platforms, applying Test-Driven Development (TDD) principles. Additionally, he identified and resolved a critical CI/CD pipeline bug that bottlenecked over 200 engineers, which reduced build times by 5% and improved team efficiency."
     },
     {
         "question": "How long was he at Apple?",
         "contexts": [
-            "Anmol worked at Apple as an Engineering Intern for 3 months during the summer.",
-            "His internship lasted from May to August, totaling 3 months."
+            "At Apple, Anmol worked as an Engineering Intern from May 2024 to August 2024.",
+            "Anmol was at Apple for a duration of three months, from May 2024 to August 2024."
         ],
-        "answer": "He was at Apple for 3 months during the summer.",
-        "ground_truth": "He was at Apple for 3 months during the summer."
+        "answer": "Anmol was at Apple for a duration of three months, from May 2024 to August 2024.",
+        "ground_truth": "Anmol was at Apple for a duration of three months, from May 2024 to August 2024."
     }
 ]
 

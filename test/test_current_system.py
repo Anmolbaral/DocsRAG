@@ -16,7 +16,7 @@ def test_current_system():
 		answer = system.ragPipeline.ask(question)
 		print(f"Question {i}: {question}")
 		print(f"Answer {i}: {answer}")
-		print("-"*50)
+		print("-"*100)
 
 	evaluate_RAG_system()
 	print("Evaluation complete")
