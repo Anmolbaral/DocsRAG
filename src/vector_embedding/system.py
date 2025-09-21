@@ -1,13 +1,14 @@
 from .modules.rag import RAGPipeline
 from .modules.loader import load_pdf
 from .modules.hashing import get_file_hash
-import os, json
+import glob
+import os, json, pathlib
 
 class DocumentRAGSystem:
 	def __init__(self):
 		self.ragPipeline = None
 		self.cacheDir = "cache"
-		self.allFiles = os.listdir("data")
+		self.allFolders = pathlib.Path("data")
 
 	def initialize(self):
 		"""Initiializing RAGPipeline once at startup"""
@@ -26,13 +27,13 @@ class DocumentRAGSystem:
 		fileMetadata = {}
 
 		try:
-			for file in self.allFiles:
-				fileLoc = "data/" + file
-				docs = load_pdf(fileLoc)
-				fileMetadata[file] = ({
-					"fileSize": os.path.getsize(fileLoc),
-					"fileModifiedTime": os.path.getmtime(fileLoc),
-					"fileHash": get_file_hash(fileLoc),
+			for datafile in self.allFolders.rglob("*.pdf"):
+				datafile = str(datafile)
+				docs = load_pdf(datafile)
+				fileMetadata[datafile] = ({
+					"fileSize": os.path.getsize(datafile),
+					"fileModifiedTime": os.path.getmtime(datafile),
+					"fileHash": get_file_hash(datafile),
 				})
 				allTexts.extend(docs)
 			with open("cache/file_metadata.json", "w") as f:
@@ -65,8 +66,8 @@ class DocumentRAGSystem:
 			with open("cache/file_metadata.json", "r") as f:
 				cacheMetadata = json.load(f)			
 			
-			for file in self.allFiles:
-				filePath = f"data/{file}"
+			for file in self.allFolders.rglob("*.pdf"):
+				filePath = f"{file}"
 
 				if file not in cacheMetadata.keys() or get_file_hash(filePath) != cacheMetadata[file]["fileHash"]:
 					return False

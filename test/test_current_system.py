@@ -10,13 +10,15 @@ def test_current_system():
 		"What is Anmol's work experience?",
 		"What did he do at Apple?",
 		"How long was he at Apple?",
+		"What technologies and tools did Anmol work with?",
+		"What achievements or impact did Anmol have in his roles?"
 	]
 
 	for i, question in enumerate(questions, 1):
 		answer = system.ragPipeline.ask(question)
 		print(f"Question {i}: {question}")
 		print(f"Answer {i}: {answer}")
-		print("-"*100)
+		print("-"*50)
 
 	evaluate_RAG_system()
 	print("Evaluation complete")
