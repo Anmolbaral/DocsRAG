@@ -1,6 +1,8 @@
 from .embeddings import get_embedding, get_embeddings
 from .vectordb import VectorDB
 import openai, os, json
+import numpy as np
+from sklearn.metrics.pairwise import cosine_similarity
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
 class RAGPipeline:
@@ -36,14 +38,28 @@ class RAGPipeline:
 			obj.db.add(obj.embeddings[i], chunk["text"], chunk["metadata"])
 		return obj
 	
+	def create_category_embeddings(self):
+		category = {	
+			"resume" : "Facts about personal details, work experience, projects,education, and skills",
+			"cover_letters" : "Motivational writing, personal pitch about why I want a role and why I am good fit for this role",
+			"misc_docs" :  "Other documents like essays, notes, papers, and additional background about the individual"
+		}
+		categoryEmbedding = {cat: get_embedding(desc) for cat, desc in category.items()}
+		return categoryEmbedding
 	
 	def ask(self, query):
 		queryEmb = get_embedding(query)
-		results = self.db.search(queryEmb, k = 5)
+		print(type(queryEmb))
+		categoryEmbedding = self.create_category_embeddings()
+		print(type(categoryEmbedding["resume"]))
+		closestCategory = max(categoryEmbedding, key=lambda x: cosine_similarity([queryEmb], [categoryEmbedding[x]])[0][0])
+		print(f"-----Closest Category-----:\n{closestCategory}")
+		results = self.db.search(queryEmb, k = 2)
 		contextParts = []
 		for result in results:
-			contextParts.append(f"Page {result['metadata']['page']} - {result['metadata']['section']}: {result['text']}")
+			contextParts.append(f"Page {result['metadata']['page']} - {result['metadata']['filename']} - {result['metadata']['isGroundTruth']}: {result['text']}")
 		context = "\n".join(contextParts)
+		print(f"-----Context-----:\n{context}")
 		messages = self.build_converation_context(context)
 		messages.append({"role": "user", "content": query})
 		response = openai.chat.completions.create(

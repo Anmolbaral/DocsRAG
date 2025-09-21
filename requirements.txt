@@ -8,3 +8,4 @@ ragas
 langsmith
 langchain
 langchain-openai
+scikit-learn

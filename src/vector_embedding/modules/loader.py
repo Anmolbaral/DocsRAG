@@ -5,7 +5,7 @@ import re, os
 def load_pdf(path):
 	try:
 		if os.path.getsize(path) == 0:
-			print(f"File {path} is empty")
+			# print(f"File {path} is empty")
 			return []
 		reader = PdfReader(path)
 		all_chunks= []
@@ -14,12 +14,18 @@ def load_pdf(path):
 			if text:
 				chunkTexts = create_overlap_chunks(text, chunkSize=5, overlap=2)
 				for chunkIndex, chunkText in enumerate(chunkTexts):
+					if path.split("/")[-2] == "resume":
+						groundTruth = True
+					else:
+						groundTruth = False
 					chunkObject = {
 						"text": chunkText,
 						"metadata": {
 							"page": pageNum+1,
 							"path": path,
-							"section": path.split("/")[-1],
+							"category": path.split("/")[-2],
+							"filename": path.split("/")[-1],
+							"isGroundTruth": groundTruth,
 							"chunkId": chunkIndex
 						}	
 					}
