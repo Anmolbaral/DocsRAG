@@ -18,6 +18,9 @@ class RAGPipeline:
 		#Adding conversation memory
 		self.conversationHistory = []
 		self.maxHistory = 10
+		
+		# Cache category embeddings once during initialization
+		self.categoryEmbeddings = self.create_category_embeddings()
 	
 
 	@classmethod
@@ -33,6 +36,9 @@ class RAGPipeline:
 		# Intializing conversation history
 		obj.conversationHistory = []
 		obj.maxHistory = 10
+		
+		# Cache category embeddings once during initialization
+		obj.categoryEmbeddings = obj.create_category_embeddings()
 
 		for i, chunk in enumerate(obj.chunks):
 			obj.db.add(obj.embeddings[i], chunk["text"], chunk["metadata"])
@@ -40,32 +46,61 @@ class RAGPipeline:
 	
 	def create_category_embeddings(self):
 		category = {	
-			"resume" : "Facts about personal details, work experience, projects,education, and skills",
-			"cover_letters" : "Motivational writing, personal pitch about why I want a role and why I am good fit for this role",
-			"misc_docs" :  "Other documents like essays, notes, papers, and additional background about the individual"
+        	"resume": "Professional career document containing work experience, technical skills, education background, projects, and quantified achievements. Formal tone with bullet points, dates, company names, job titles, and measurable accomplishments. Focus on qualifications, competencies, and professional history.",
+        	"cover_letters": "Personal application letters expressing interest in specific job roles and companies. Conversational tone showing enthusiasm, motivation, and personal fit for positions. Contains phrases like 'excited about', 'passionate about', 'would love to', and explanations of why someone wants a particular role or company.",
+        	"misc_docs": "Academic papers, essays, fellowship applications, and personal writings about broader topics like education, community impact, research, and personal philosophy. Reflective tone discussing values, social impact, academic work, and personal growth experiences."
 		}
 		categoryEmbedding = {cat: get_embedding(desc) for cat, desc in category.items()}
 		return categoryEmbedding
-	
+
+	def calculate_confidence(self, queryEmb, categoryEmbedding):
+		categoryScore = {cat: cosine_similarity([queryEmb], [categoryEmbedding[cat]])[0][0] for cat in categoryEmbedding}
+		
+		sortedScore = sorted(categoryScore.values(), reverse = True)
+		print(f"Sorted Score: {sortedScore}")
+
+		relativeConfidence = sortedScore[0] - sortedScore[1] if len(sortedScore) > 1 else sortedScore[0]
+		print(f"Relative Confidence: {relativeConfidence}")
+		
+		return relativeConfidence, categoryScore
+
+
 	def ask(self, query):
 		queryEmb = get_embedding(query)
-		print(type(queryEmb))
-		categoryEmbedding = self.create_category_embeddings()
-		print(type(categoryEmbedding["resume"]))
-		closestCategory = max(categoryEmbedding, key=lambda x: cosine_similarity([queryEmb], [categoryEmbedding[x]])[0][0])
+		# Use cached category embeddings instead of recalculating
+		categoryEmbedding = self.categoryEmbeddings		
+
+		confidence, categoryScore = self.calculate_confidence(queryEmb, categoryEmbedding)
+		closestCategory = max(categoryScore, key=lambda x: categoryScore[x])
 		print(f"-----Closest Category-----:\n{closestCategory}")
-		results = self.db.search(queryEmb, k = 2)
+
+		# Thresholding the confidence
+		if confidence > 0.25:
+			k = 3
+		elif confidence > 0.15:
+			k = 5
+		else:
+			k = 8
+		results = self.db.search(queryEmb, k)
+
 		contextParts = []
-		for result in results:
-			contextParts.append(f"Page {result['metadata']['page']} - {result['metadata']['filename']} - {result['metadata']['isGroundTruth']}: {result['text']}")
+		if confidence > 0.15:
+			for result in results:
+				if result['metadata']['category'] == closestCategory:
+					contextParts.append(f"Page {result['metadata']['page']} - {result['metadata']['filename']}: {result['text']}")
+		else:
+			for result in results:
+				contextParts.append(f"Page {result['metadata']['page']} - {result['metadata']['filename']}: {result['text']}")
+
+
 		context = "\n".join(contextParts)
-		print(f"-----Context-----:\n{context}")
 		messages = self.build_converation_context(context)
 		messages.append({"role": "user", "content": query})
 		response = openai.chat.completions.create(
 			model = "gpt-4o-mini",
 			messages = messages
 		)
+
 		self.add_to_conversation_history(query, response.choices[0].message.content)
 		return response.choices[0].message.content
 	

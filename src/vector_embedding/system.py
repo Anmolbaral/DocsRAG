@@ -49,7 +49,10 @@ class DocumentRAGSystem:
 				query = input("Ask a question or type 'exit' to quit: ")
 				if query == "exit":
 					return
-				answer = self.ragPipeline.ask(query)
+				elif query.strip() == "":
+					continue
+				else:
+					answer = self.ragPipeline.ask(query)
 				print("Answer: ", answer)
 
 			except Exception as e:
@@ -67,9 +70,9 @@ class DocumentRAGSystem:
 				cacheMetadata = json.load(f)			
 			
 			for file in self.allFolders.rglob("*.pdf"):
-				filePath = f"{file}"
-
-				if file not in cacheMetadata.keys() or get_file_hash(filePath) != cacheMetadata[file]["fileHash"]:
+				file = str(file)
+				
+				if file not in cacheMetadata.keys() or get_file_hash(file) != cacheMetadata[file]["fileHash"]:
 					return False
 
 			return True
