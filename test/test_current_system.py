@@ -16,9 +16,7 @@ def test_current_system():
 
 	for i, question in enumerate(questions, 1):
 		answer = system.ragPipeline.ask(question)
-		print(f"Question {i}: {question}")
-		print(f"Answer {i}: {answer}")
-		print("-"*50)
+		assert answer is not None and answer.strip() != ""
 
 	evaluate_RAG_system()
 	print("Evaluation complete")

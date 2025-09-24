@@ -5,7 +5,6 @@ import re, os
 def load_pdf(path):
 	try:
 		if os.path.getsize(path) == 0:
-			# print(f"File {path} is empty")
 			return []
 		reader = PdfReader(path)
 		all_chunks= []

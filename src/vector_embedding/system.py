@@ -53,7 +53,8 @@ class DocumentRAGSystem:
 					continue
 				else:
 					answer = self.ragPipeline.ask(query)
-				print("Answer: ", answer)
+
+					print("\n------Answer------\n", answer)
 
 			except Exception as e:
 				print(f"Error answering query: {e}")

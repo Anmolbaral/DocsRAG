@@ -53,26 +53,29 @@ class RAGPipeline:
 		categoryEmbedding = {cat: get_embedding(desc) for cat, desc in category.items()}
 		return categoryEmbedding
 
-	def calculate_confidence(self, queryEmb, categoryEmbedding):
+	def calculate_confidence(self, queryEmb, categoryEmbedding, debug=False):
 		categoryScore = {cat: cosine_similarity([queryEmb], [categoryEmbedding[cat]])[0][0] for cat in categoryEmbedding}
 		
 		sortedScore = sorted(categoryScore.values(), reverse = True)
-		print(f"Sorted Score: {sortedScore}")
+		if debug:
+			print(f"Sorted Score: {sortedScore}")
 
 		relativeConfidence = sortedScore[0] - sortedScore[1] if len(sortedScore) > 1 else sortedScore[0]
-		print(f"Relative Confidence: {relativeConfidence}")
+		if debug:
+			print(f"Relative Confidence: {relativeConfidence}")
 		
 		return relativeConfidence, categoryScore
 
 
-	def ask(self, query):
+	def ask(self, query, debug=False):
 		queryEmb = get_embedding(query)
 		# Use cached category embeddings instead of recalculating
 		categoryEmbedding = self.categoryEmbeddings		
 
-		confidence, categoryScore = self.calculate_confidence(queryEmb, categoryEmbedding)
+		confidence, categoryScore = self.calculate_confidence(queryEmb, categoryEmbedding, debug)
 		closestCategory = max(categoryScore, key=lambda x: categoryScore[x])
-		print(f"-----Closest Category-----:\n{closestCategory}")
+		if debug:
+			print(f"-----Closest Category-----:\n{closestCategory}")
 
 		# Thresholding the confidence
 		if confidence > 0.25:
