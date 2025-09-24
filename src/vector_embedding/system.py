@@ -5,17 +5,21 @@ import glob
 import os, json, pathlib
 
 class DocumentRAGSystem:
-	def __init__(self):
+	def __init__(self, embedder=None, chat_client=None, cacheDir="cache", dataDir="data"):
 		self.ragPipeline = None
-		self.cacheDir = "cache"
-		self.allFolders = pathlib.Path("data")
+		self.cacheDir = cacheDir
+		self.allFolders = pathlib.Path(dataDir)
+		self._embedder = embedder
+		self._chat_client = chat_client
 
 	def initialize(self):
 		"""Initiializing RAGPipeline once at startup"""
+		# Ensure cache directory exists before reading/writing
+		os.makedirs(self.cacheDir, exist_ok=True)
 
 		if self.cache_is_valid():
 			print("Using cached embeddings")
-			self.ragPipeline = RAGPipeline.from_cache()
+			self.ragPipeline = RAGPipeline.from_cache(cacheFile=f"{self.cacheDir}/embeddings.json", embedder=self._embedder, chat_client=self._chat_client)
 		else:
 			print("Using new embeddings")
 			self.ragPipeline = self.data_pipeline()
@@ -36,9 +40,11 @@ class DocumentRAGSystem:
 					"fileHash": get_file_hash(datafile),
 				})
 				allTexts.extend(docs)
-			with open("cache/file_metadata.json", "w") as f:
+			# Ensure cache directory exists before writing metadata
+			os.makedirs(self.cacheDir, exist_ok=True)
+			with open(f"{self.cacheDir}/file_metadata.json", "w") as f:
 				json.dump(fileMetadata, f, indent=2)
-			return RAGPipeline(allTexts)
+			return RAGPipeline(allTexts, embedder=self._embedder, chat_client=self._chat_client, cache_file=f"{self.cacheDir}/embeddings.json")
 		except Exception as e:
 			print(f"Error processing files: {e}")
 			raise e
@@ -46,7 +52,7 @@ class DocumentRAGSystem:
 	def user_interaction(self):
 		while True:
 			try:
-				query = input("Ask a question or type 'exit' to quit: ")
+				query = input("\nAsk a question or type 'exit' to quit: ")
 				if query == "exit":
 					return
 				elif query.strip() == "":
@@ -54,7 +60,7 @@ class DocumentRAGSystem:
 				else:
 					answer = self.ragPipeline.ask(query)
 
-					print("\n------Answer------\n", answer)
+					print("\n---------Answer---------\n", answer)
 
 			except Exception as e:
 				print(f"Error answering query: {e}")
@@ -64,10 +70,10 @@ class DocumentRAGSystem:
 	"""No need to make a new embedding cache if the file metadata is valid"""
 	def cache_is_valid(self):
 		try:
-			if os.path.getsize("cache/file_metadata.json") == 0:
+			if os.path.getsize(f"{self.cacheDir}/file_metadata.json") == 0:
 				return False
 
-			with open("cache/file_metadata.json", "r") as f:
+			with open(f"{self.cacheDir}/file_metadata.json", "r") as f:
 				cacheMetadata = json.load(f)			
 			
 			for file in self.allFolders.rglob("*.pdf"):

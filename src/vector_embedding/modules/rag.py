@@ -6,11 +6,15 @@ from sklearn.metrics.pairwise import cosine_similarity
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
 class RAGPipeline:
-	def __init__(self, chunks):
+	def __init__(self, chunks, embedder=None, chat_client=None, cache_file="cache/embeddings.json"):
 		self.db = VectorDB(dim=1536)
 		self.texts = [chunk["text"] for chunk in chunks]
 		self.chunks = chunks
-		self.embeddings = get_embeddings(self.texts)
+		self._embedder_single = getattr(embedder, "get_embedding", None) if embedder else get_embedding
+		self._embedder_batch = getattr(embedder, "get_embeddings", None) if embedder else get_embeddings
+		self._chat_client = chat_client
+		self._cache_file = cache_file
+		self.embeddings = self._embedder_batch(self.texts)
 		for i, t in enumerate(chunks):
 			self.db.add(self.embeddings[i], t["text"], t["metadata"])
 		self.add_to_cache()
@@ -24,7 +28,7 @@ class RAGPipeline:
 	
 
 	@classmethod
-	def from_cache(cls, cacheFile = "cache/embeddings.json"):
+	def from_cache(cls, cacheFile = "cache/embeddings.json", embedder=None, chat_client=None):
 		with open(cacheFile, "r") as f:
 			metadata = json.load(f)
 
@@ -32,6 +36,10 @@ class RAGPipeline:
 		obj.db = VectorDB(dim=1536)
 		obj.chunks = metadata["chunks"]
 		obj.embeddings = metadata["embeddings"]
+		obj._embedder_single = getattr(embedder, "get_embedding", None) if embedder else get_embedding
+		obj._embedder_batch = getattr(embedder, "get_embeddings", None) if embedder else get_embeddings
+		obj._chat_client = chat_client
+		obj._cache_file = cacheFile
 
 		# Intializing conversation history
 		obj.conversationHistory = []
@@ -50,7 +58,7 @@ class RAGPipeline:
         	"cover_letters": "Personal application letters expressing interest in specific job roles and companies. Conversational tone showing enthusiasm, motivation, and personal fit for positions. Contains phrases like 'excited about', 'passionate about', 'would love to', and explanations of why someone wants a particular role or company.",
         	"misc_docs": "Academic papers, essays, fellowship applications, and personal writings about broader topics like education, community impact, research, and personal philosophy. Reflective tone discussing values, social impact, academic work, and personal growth experiences."
 		}
-		categoryEmbedding = {cat: get_embedding(desc) for cat, desc in category.items()}
+		categoryEmbedding = {cat: self._embedder_single(desc) for cat, desc in category.items()}
 		return categoryEmbedding
 
 	def calculate_confidence(self, queryEmb, categoryEmbedding, debug=False):
@@ -68,7 +76,7 @@ class RAGPipeline:
 
 
 	def ask(self, query, debug=False):
-		queryEmb = get_embedding(query)
+		queryEmb = self._embedder_single(query)
 		# Use cached category embeddings instead of recalculating
 		categoryEmbedding = self.categoryEmbeddings		
 
@@ -99,11 +107,14 @@ class RAGPipeline:
 		context = "\n".join(contextParts)
 		messages = self.build_converation_context(context)
 		messages.append({"role": "user", "content": query})
+		if self._chat_client is not None:
+			response_text = self._chat_client(messages)
+			self.add_to_conversation_history(query, response_text)
+			return response_text
 		response = openai.chat.completions.create(
 			model = "gpt-4o-mini",
 			messages = messages
 		)
-
 		self.add_to_conversation_history(query, response.choices[0].message.content)
 		return response.choices[0].message.content
 	
@@ -123,11 +134,24 @@ class RAGPipeline:
 			self.conversationHistory.pop(0)
 
 	def add_to_cache(self):
+		# Ensure embeddings are JSON serializable (convert numpy arrays to lists)
+		serializable_embeddings = []
+		for emb in self.embeddings:
+			if isinstance(emb, np.ndarray):
+				serializable_embeddings.append(emb.tolist())
+			else:
+				# Already a plain list (or similar);
+				# ensure nested numpy types are handled
+				try:
+					serializable_embeddings.append(np.asarray(emb).tolist())
+				except Exception:
+					serializable_embeddings.append(emb)
+
 		cacheData= {
 			"chunks": self.chunks,
-			"embeddings":self.embeddings,
+			"embeddings": serializable_embeddings,
 		}
-		with open("cache/embeddings.json", "w") as f:
+		with open(self._cache_file, "w") as f:
 			json.dump(cacheData, f, indent=2)
 			
 
