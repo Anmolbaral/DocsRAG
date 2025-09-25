@@ -29,29 +29,30 @@ def evaluate_RAG_system():
 		# Create evaluation record
 		eval_record = {
 			'question': data['question'],
-			'contexts': data['contexts'],  
+			'contexts': [str(context) for context in data['contexts']],  
 			'answer': generated_answer,  
-			'ground_truth': data['ground_truth']  
+			'ground_truth': str(data['ground_truth'])  
 		}
 		evaluation_data.append(eval_record)
 	
 	# Convert to Dataset
 	eval_dataset = Dataset.from_list(evaluation_data)
-	
-	print(f"Evaluating {len(evaluation_data)} questions...")
-	
+
 	try:
+		# First, try with stable metrics only (excluding answer_relevancy which causes IndexError)
 		result = evaluate(
 			dataset=eval_dataset,
 			metrics=[
 				faithfulness,
-				answer_relevancy,
 				context_precision,
-				context_recall
+				context_recall,
+				answer_relevancy
 			],
 			llm=llm,
 			embeddings=embeddings,
-			raise_exceptions=False
+			raise_exceptions=False,
+			batch_size=1,  # Process one at a time to avoid parallel processing issues
+			show_progress=True
 		)
 		print("\n=== RAGAS EVALUATION RESULTS ===")
 		print(result)
