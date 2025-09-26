@@ -82,12 +82,12 @@ class RAGPipeline:
 
 		confidence, categoryScore = self.calculate_confidence(queryEmb, categoryEmbedding, debug)
 		closestCategory = max(categoryScore, key=lambda x: categoryScore[x])
-		if debug:
-			print(f"-----Closest Category-----:\n{closestCategory}")
+		
+		print(f"-----Closest Category-----:\n{closestCategory}")
 
 		# Thresholding the confidence
 		if confidence > 0.25:
-			k = 3
+			k = 2
 		elif confidence > 0.15:
 			k = 5
 		else:
@@ -120,7 +120,7 @@ class RAGPipeline:
 	
 	def build_converation_context(self, documentContext):
 		conversationContext = []
-		conversationContext.append({'role': 'system', 'content': f'You are a helpful assistant that can answer questions about the context provided. USe conversation history to understant the references and context'})
+		conversationContext.append({'role': 'system', 'content': f'You are a helpful assistant that can only answer questions from the context provided. Use conversation history to understant the references and context'})
 		conversationContext.append({'role':'user', 'content': f'Document Context: {documentContext}'})
 		if self.conversationHistory:
 			for conversation in self.conversationHistory:
@@ -140,8 +140,6 @@ class RAGPipeline:
 			if isinstance(emb, np.ndarray):
 				serializable_embeddings.append(emb.tolist())
 			else:
-				# Already a plain list (or similar);
-				# ensure nested numpy types are handled
 				try:
 					serializable_embeddings.append(np.asarray(emb).tolist())
 				except Exception:

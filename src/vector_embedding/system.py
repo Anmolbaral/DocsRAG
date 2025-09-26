@@ -70,7 +70,7 @@ class DocumentRAGSystem:
 	"""No need to make a new embedding cache if the file metadata is valid"""
 	def cache_is_valid(self):
 		try:
-			if os.path.getsize(f"{self.cacheDir}/file_metadata.json") == 0:
+			if os.path.getsize(f"{self.cacheDir}/file_metadata.json") == 0 or os.path.getsize(f"{self.cacheDir}/embeddings.json") == 0:
 				return False
 
 			with open(f"{self.cacheDir}/file_metadata.json", "r") as f:

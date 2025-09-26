@@ -5,8 +5,8 @@ load_dotenv()
 
 client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-def get_embedding(texts, model="text-embedding-3-small"):
-	response = client.embeddings.create(input=texts, model=model)
+def get_embedding(text, model="text-embedding-3-small"):
+	response = client.embeddings.create(input=text, model=model)
 	return response.data[0].embedding
 
 def get_embeddings(texts, model="text-embedding-3-small"):
