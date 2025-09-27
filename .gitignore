@@ -2,9 +2,10 @@ vector_venv/
 .env
 __pycache__/
 *.pyc
-data/*.pdf
+data/**/*.pdf
 !data/sample.pdf
-.DS_Store*.dylib
+.DS_Store
+*.dylib
 cache/
 todo.txt
 config.yaml
