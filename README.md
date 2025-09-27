@@ -1,31 +1,21 @@
 # Personal Document RAG System
 
-A Retrieval-Augmented Generation (RAG) system built with Python that enables intelligent question-answering over personal documents using OpenAI embeddings and FAISS vector search.
+I built this Retrieval-Augmented Generation (RAG) system built with Python that enables intelligent question-answering over personal documents using OpenAI embeddings and FAISS vector search.
 
 ## Features
 
 - Multi-Document Processing: Automatically processes all PDF files in the data directory
 - Advanced Text Chunking: Implements sentence-based overlapping chunks for better context preservation
 - Vector Search: Uses FAISS (Facebook AI Similarity Search) with L2 distance for efficient similarity search
+   - Uses FAISS IndexHNSWFlat for approximate nearest neighbor search with HNSW graph structure
 - Metadata Tracking: Maintains source information (filename, page number) for transparency
+   - Stored in JSON format with nested structures for readability and easy debugging 
 - Interactive Q&A: Real-time question answering with source attribution
 - Smart Text Cleaning: Handles PDF formatting issues with regex-based preprocessing
+- **Embedding Model**: Uses "text-embedding-3-large" with 3072 dimensions for enhanced semantic understanding
+- **Alternative**: Can use "text-embedding-3-small" (1536 dimensions) for lower API costs
 
-## Project Structure
 
-```
-Vector Embedding/
-├── main.py                 # Entry point and interactive loop
-├── requirements.txt        # Python dependencies
-├── data/                   # PDF documents directory
-│   ├─ .pdf
-|   ├─ .pdf
-└── modules/
-    ├── loader.py          # PDF processing and text chunking
-    ├── embeddings.py      # OpenAI embedding functions
-    ├── vectordb.py        # FAISS vector database wrapper
-    └── rag.py            # RAG pipeline orchestration
-```
 
 ## Installation
 
@@ -59,7 +49,7 @@ Vector Embedding/
 
 1. Start the system
    ```bash
-   python main.py
+   python -m src.vector_embedding.main
    ```
 
 2. Ask questions
@@ -92,7 +82,7 @@ model = "gpt-4o-mini"  # LLM model for response generation
 ### Embedding Model
 ```python
 # In modules/embeddings.py
-model = "text-embedding-3-small"  # OpenAI embedding model
+model = "text-embedding-3-large"  # OpenAI embedding model (3072 dimensions)
 ```
 
 ## Dependencies
