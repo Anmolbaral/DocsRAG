@@ -3,7 +3,7 @@ import numpy as np
 
 class VectorDB:
 	def __init__(self, dim):
-		self.index = faiss.IndexFlatL2(dim)
+		self.index = faiss.IndexHNSWFlat(dim, 32)
 		self.texts = []
 		self.metadata = []
 

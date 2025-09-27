@@ -3,6 +3,7 @@ from .modules.loader import load_pdf
 from .modules.hashing import get_file_hash
 import glob
 import os, json, pathlib
+import time
 
 class DocumentRAGSystem:
 	def __init__(self, embedder=None, chat_client=None, cacheDir="cache", dataDir="data"):
@@ -53,14 +54,16 @@ class DocumentRAGSystem:
 		while True:
 			try:
 				query = input("\nAsk a question or type 'exit' to quit: ")
+				start_time = time.time()
 				if query == "exit":
 					return
 				elif query.strip() == "":
 					continue
 				else:
 					answer = self.ragPipeline.ask(query)
-
+					end_time = time.time()
 					print("\n---------Answer---------\n", answer)
+					print(f'Time taken: {end_time - start_time} seconds')
 
 			except Exception as e:
 				print(f"Error answering query: {e}")

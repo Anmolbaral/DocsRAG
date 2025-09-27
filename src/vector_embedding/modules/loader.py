@@ -40,32 +40,10 @@ def split_into_sentences(text):
 	text = re.sub(r'\s+', ' ', text)
 	text = re.sub(r'-\s+', '', text)
 	sentences = re.split(r'[.!?]', text)
-	
-	# 2. Replace bullet points and list markers
-	bullet_patterns = {
-        '\u25cf': '• ',      
-        '\u2022': '• ',      
-        '\u2023': '• ',      
-        '\u2043': '• ',      # Hyphen bullet (⁃)
-        '\u204c': '• ',      # Black leftwards bullet (⁌)
-        '\u204d': '• ',      # Black rightwards bullet (⁍)
-        '\u2219': '• ',      # Bullet operator (∙)
-        '\u25e6': '• ',      # White bullet (◦)
-        '●': '• ',           # Black circle
-        '○': '• ',           # White circle
-        '■': '• ',           # Black square
-        '□': '• ',           # White square
-        '▪': '• ',           # Black small square
-        '▫': '• ',           # White small square
-    }
 
 	clean_sentences = []
 
 	for sentence in sentences:
-		# Apply bullet point replacements to each sentence
-		for unicode_char, replacement in bullet_patterns.items():
-			sentence = sentence.replace(unicode_char, replacement)
-		
 		sentence = sentence.strip()
 		if sentence:
 			clean_sentences.append(sentence + '.')

@@ -13,7 +13,7 @@ load_dotenv()
 warnings.filterwarnings("ignore")
 
 llm = ChatOpenAI(model = 'gpt-4o-mini', temperature = 0)
-embeddings = OpenAIEmbeddings(model = 'text-embedding-3-small')
+embeddings = OpenAIEmbeddings(model = 'text-embedding-3-large')
 
 def evaluate_RAG_system():
 	# Initialize RAG system

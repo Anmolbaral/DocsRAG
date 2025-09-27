@@ -7,7 +7,7 @@ openai.api_key = os.getenv("OPENAI_API_KEY")
 
 class RAGPipeline:
 	def __init__(self, chunks, embedder=None, chat_client=None, cache_file="cache/embeddings.json"):
-		self.db = VectorDB(dim=1536)
+		self.db = VectorDB(dim=3072)
 		self.texts = [chunk["text"] for chunk in chunks]
 		self.chunks = chunks
 		self._embedder_single = getattr(embedder, "get_embedding", None) if embedder else get_embedding
@@ -33,7 +33,7 @@ class RAGPipeline:
 			metadata = json.load(f)
 
 		obj = cls.__new__(cls)
-		obj.db = VectorDB(dim=1536)
+		obj.db = VectorDB(dim=3072)
 		obj.chunks = metadata["chunks"]
 		obj.embeddings = metadata["embeddings"]
 		obj._embedder_single = getattr(embedder, "get_embedding", None) if embedder else get_embedding
