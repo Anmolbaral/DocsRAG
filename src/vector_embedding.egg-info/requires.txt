@@ -8,3 +8,5 @@ ragas
 langsmith
 langchain
 langchain-openai
+sentence-transformers
+torch

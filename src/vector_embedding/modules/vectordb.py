@@ -1,5 +1,6 @@
 import faiss
 import numpy as np
+import pyarrow.parquet as pq
 
 class VectorDB:
 	def __init__(self, dim):
@@ -21,6 +22,6 @@ class VectorDB:
 			results.append({
 				"text": self.texts[match],
 				"metadata": self.metadata[match],
-				"distance": distances[0][idx]
+				"distance": distances[0][idx],
 			})
 		return results

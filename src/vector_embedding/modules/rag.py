@@ -1,5 +1,6 @@
 from .embeddings import get_embedding, get_embeddings
 from .vectordb import VectorDB
+from .reranker import initialize_reranker, rerank_candidates as rerank_candidates_func
 import openai, os, json
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
@@ -25,6 +26,9 @@ class RAGPipeline:
 		
 		# Cache category embeddings once during initialization
 		self.categoryEmbeddings = self.create_category_embeddings()
+		
+		# Initialize reranker
+		self.reranker = initialize_reranker()
 	
 
 	@classmethod
@@ -47,6 +51,9 @@ class RAGPipeline:
 		
 		# Cache category embeddings once during initialization
 		obj.categoryEmbeddings = obj.create_category_embeddings()
+		
+		# Initialize reranker
+		obj.reranker = initialize_reranker()
 
 		for i, chunk in enumerate(obj.chunks):
 			obj.db.add(obj.embeddings[i], chunk["text"], chunk["metadata"])
@@ -87,21 +94,25 @@ class RAGPipeline:
 
 		# Thresholding the confidence
 		if confidence > 0.25:
-			k = 2
+			K_retrieve = 50
+			K_context = 3
 		elif confidence > 0.15:
-			k = 5
+			K_retrieve = 75
+			K_context = 6
 		else:
-			k = 8
-		results = self.db.search(queryEmb, k)
+			K_retrieve = 120
+			K_context = 10
+		
+		# Retrieve candidates and rerank them
+		candidates = self.db.search(queryEmb, K_retrieve)
+		if confidence > 0.15:
+			candidates = [c for c in candidates if c["metadata"]["category"] == closestCategory]
+		results = rerank_candidates_func(query, candidates, self.reranker, top_k=K_context)
+		
 
 		contextParts = []
-		if confidence > 0.15:
-			for result in results:
-				if result['metadata']['category'] == closestCategory:
-					contextParts.append(f"Page {result['metadata']['page']} - {result['metadata']['filename']}: {result['text']}")
-		else:
-			for result in results:
-				contextParts.append(f"Page {result['metadata']['page']} - {result['metadata']['filename']}: {result['text']}")
+		for result in results:
+			contextParts.append(f"Page {result['metadata']['page']} - {result['metadata']['filename']}: {result['text']}")
 
 
 		context = "\n".join(contextParts)
@@ -110,13 +121,20 @@ class RAGPipeline:
 		if self._chat_client is not None:
 			response_text = self._chat_client(messages)
 			self.add_to_conversation_history(query, response_text)
-			return response_text
+			# Add source information for custom chat client
+			sources = [f"{result['metadata']['category']}/{result['metadata']['filename']}" for result in results[:3]]
+			queryAnswer = response_text + f"\n\n-----Sources: {', '.join(sources)}"
+			return queryAnswer
+		
 		response = openai.chat.completions.create(
 			model = "gpt-4o-mini",
 			messages = messages
 		)
 		self.add_to_conversation_history(query, response.choices[0].message.content)
-		return response.choices[0].message.content
+		# Add source information for OpenAI response
+		sources = [f"{result['metadata']['category']}/{result['metadata']['filename']}" for result in results[:3]]
+		queryAnswer = response.choices[0].message.content + f"\n\n-----Sources: {', '.join(sources)}"
+		return queryAnswer
 	
 	def build_converation_context(self, documentContext):
 		conversationContext = []
@@ -132,6 +150,10 @@ class RAGPipeline:
 		self.conversationHistory.append({"user":{"role": "user", "content": query}, "assistant":{'role':'assistant', 'content':response}})
 		if len(self.conversationHistory) > self.maxHistory:
 			self.conversationHistory.pop(0)
+	
+	def rerank_candidates(self, query: str, candidates: list, top_k: int = 10):
+		"""Rerank candidates using the reranker model"""
+		return rerank_candidates_func(query, candidates, self.reranker, top_k=top_k)
 
 	def add_to_cache(self):
 		# Ensure embeddings are JSON serializable (convert numpy arrays to lists)
