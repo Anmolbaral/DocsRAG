@@ -81,6 +81,8 @@ model = "gpt-4o-mini"
 model = "text-embedding-3-large"
 ```
 
+Note: The VectorDB dimension is hardcoded to 3072 to match text-embedding-3-large. If changing the embedding model, you must also update `VectorDB(dim=...)` in `rag.py` to match the model's output dimensions (e.g., 1536 for text-embedding-3-small).
+
 ### Reranker Model
 ```python
 model = "cross-encoder/ms-marco-MiniLM-L-6-v2"
