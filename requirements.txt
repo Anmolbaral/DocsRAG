@@ -10,3 +10,5 @@ langchain
 langchain-openai
 scikit-learn
 sentence-transformers
+ruff
+black

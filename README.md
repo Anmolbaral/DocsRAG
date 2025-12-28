@@ -45,21 +45,15 @@ Retrieval-Augmented Generation (RAG) system for intelligent question-answering o
 
 ## Usage
 
-1. Start the system
-   ```bash
-   python -m src.vector_embedding.main
-   ```
+Import and use as a library:
 
-2. Ask questions
-   ```
-   Ask a question: What is Anmol's work experience?
-   ```
+```python
+from vector_embedding import DocumentRAGSystem
 
-3. View results with source attribution
-   ```
-   Page 1 - resume.pdf: I worked at Apple as an Engineering Intern...
-   Page 2 - context1.pdf: During my internship at Tufts University...
-   ```
+system = DocumentRAGSystem()
+system.initialize()
+answer = system.query("What is your question?")
+```
 
 ## Configuration
 
