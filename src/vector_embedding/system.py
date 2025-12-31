@@ -184,12 +184,12 @@ class DocumentRAGSystem:
                     }
 
             if allTexts:
-                from .modules.embeddings import get_embeddings
+                from .modules.embeddings import get_embedding_batch
 
                 _embedder_batch = (
                     getattr(self._embedder, "get_embeddings", None)
                     if self._embedder
-                    else get_embeddings
+                    else get_embedding_batch
                 )
                 new_texts = [chunk["text"] for chunk in allTexts]
                 new_embeddings = _embedder_batch(new_texts)

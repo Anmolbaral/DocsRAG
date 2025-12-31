@@ -1,4 +1,4 @@
-from .embeddings import get_embedding, get_embeddings
+from .embeddings import get_embedding_single, get_embedding_batch
 from .vectordb import VectorDB
 from .reranker import initialize_reranker, rerank_candidates as rerank_candidates_func
 import openai
@@ -6,6 +6,7 @@ import os
 import json
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
+from .bm25 import BM25Index
 
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
@@ -21,17 +22,25 @@ class RAGPipeline:
         self.db = VectorDB(dim=3072)
         self.texts = [chunk["text"] for chunk in chunks]
         self.chunks = chunks
+        self.bm25Index = BM25Index(self.texts)
         self._embedder_single = (
-            getattr(embedder, "get_embedding", None) if embedder else get_embedding
+            getattr(embedder, "get_embedding", None) if embedder else get_embedding_single
         )
         self._embedder_batch = (
-            getattr(embedder, "get_embeddings", None) if embedder else get_embeddings
+            getattr(embedder, "get_embeddings", None) if embedder else get_embedding_batch
         )
         self._chat_client = chat_client
         self._cache_file = cache_file
-        self.embeddings = self._embedder_batch(self.texts)
-        for i, t in enumerate(chunks):
-            self.db.add(self.embeddings[i], t["text"], t["metadata"])
+        # If no texts are provided, return early
+        if not self.texts or not self.chunks:
+            self.embeddings = []
+            self.chunks = []
+        else:
+            self.embeddings = self._embedder_batch(self.texts)
+            for i, t in enumerate(self.chunks):
+                self.db.add(
+                    self.embeddings[i], self.chunks[i]["text"], self.chunks[i]["metadata"]
+                )
         self.add_to_cache()
 
         # Adding conversation memory
@@ -55,11 +64,13 @@ class RAGPipeline:
         obj.db = VectorDB(dim=3072)
         obj.chunks = metadata["chunks"]
         obj.embeddings = metadata["embeddings"]
+        obj.texts = [chunk["text"] for chunk in obj.chunks]
+        obj.bm25Index = BM25Index(obj.texts)
         obj._embedder_single = (
-            getattr(embedder, "get_embedding", None) if embedder else get_embedding
+            getattr(embedder, "get_embedding", None) if embedder else get_embedding_single
         )
         obj._embedder_batch = (
-            getattr(embedder, "get_embeddings", None) if embedder else get_embeddings
+            getattr(embedder, "get_embeddings", None) if embedder else get_embedding_batch
         )
         obj._chat_client = chat_client
         obj._cache_file = cacheFile
@@ -108,36 +119,63 @@ class RAGPipeline:
         return relativeConfidence, categoryScore
 
     def ask(self, query, debug=False):
+        if not self.chunks or not self.embeddings:
+            raise ValueError("Cannot query: No documents loaded.")
+
         queryEmb = self._embedder_single(query)
-        # Use cached category embeddings instead of recalculating
-        categoryEmbedding = self.categoryEmbeddings
 
-        confidence, categoryScore = self.calculate_confidence(
-            queryEmb, categoryEmbedding, debug
-        )
-        closestCategory = max(categoryScore, key=lambda x: categoryScore[x])
+        # Hybrid search parameters (fixed)
+        BM25_K = 20
+        VECTOR_K = 20
+        RERANK_TOP_N = 10
 
-        print(f"-----Closest Category-----:\n{closestCategory}")
+        # 1. BM25 search (k=20)
+        bm25Results = self.bm25Index.search(query, k=BM25_K)
+        # Convert BM25 results to same format as vector results
+        bm25Candidates = []
+        for idx, score, text in bm25Results:
+            bm25Candidates.append({
+                "text": text,
+                "metadata": self.chunks[idx]["metadata"],
+                "bm25_score": score,
+                "source": "bm25"
+            })
 
-        # Thresholding the confidence
-        if confidence > 0.25:
-            K_retrieve = 50
-            K_context = 3
-        elif confidence > 0.15:
-            K_retrieve = 75
-            K_context = 6
-        else:
-            K_retrieve = 120
-            K_context = 10
+        # 2. Vector search (k=20)
+        vectorCandidates = self.db.search(queryEmb, VECTOR_K)
+        # Add source identifier
+        for candidate in vectorCandidates:
+            candidate["source"] = "vector"
 
-        # Retrieve candidates and rerank them
-        candidates = self.db.search(queryEmb, K_retrieve)
-        if confidence > 0.15:
-            candidates = [
-                c for c in candidates if c["metadata"]["category"] == closestCategory
-            ]
+        # 3. Merge results (deduplicate by text)
+        mergedCandidates = []
+        seenTexts = set()
+        
+        # Add BM25 results first
+        for candidate in bm25Candidates:
+            textKey = candidate["text"].strip().lower()
+            if textKey not in seenTexts:
+                seenTexts.add(textKey)
+                mergedCandidates.append(candidate)
+        
+        # Add vector results (skip duplicates)
+        for candidate in vectorCandidates:
+            textKey = candidate["text"].strip().lower()
+            if textKey not in seenTexts:
+                seenTexts.add(textKey)
+                mergedCandidates.append(candidate)
+            else:
+                # If duplicate, mark as hybrid (found by both methods)
+                for existing in mergedCandidates:
+                    if existing["text"].strip().lower() == textKey:
+                        existing["source"] = "hybrid"
+                        if "distance" in candidate:
+                            existing["vector_distance"] = candidate["distance"]
+                        break
+
+        # 4. Rerank top 10
         results = rerank_candidates_func(
-            query, candidates, self.reranker, top_k=K_context
+            query, mergedCandidates, self.reranker, top_k=RERANK_TOP_N
         )
 
         contextParts = []
@@ -224,3 +262,6 @@ class RAGPipeline:
         }
         with open(self._cache_file, "w") as f:
             json.dump(cacheData, f, indent=2)
+
+    def search_bm25(self, query: str, k: int = 20):
+        return self.bm25Index.search(query, k)

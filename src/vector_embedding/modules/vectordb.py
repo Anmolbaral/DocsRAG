@@ -1,18 +1,26 @@
 import faiss
 import numpy as np
 
+
+# Vector database using FAISS IndexHNSWFlat for fast approximate nearest
+# neighbor search on high-dimensional embedding vectors.
 class VectorDB:
+    # Initialize vector database. dim should match embedding model output
+    # (e.g., 3072 for text-embedding-3-large).
     def __init__(self, dim):
         self.index = faiss.IndexHNSWFlat(dim, 32)
         self.texts = []
         self.metadata = []
 
+    # Add a vector embedding with associated text and metadata to the database.
     def add(self, vector, text, metadata=None):
         vec = np.array([vector]).astype("float32")
         self.index.add(vec)
         self.texts.append(text)
         self.metadata.append(metadata or {})
 
+    # Search for k most similar vectors. Returns list of dicts with "text",
+    # "metadata", and "distance" (lower distance = more similar).
     def search(self, query_vector, k=5):
         vec = np.array([query_vector]).astype("float32")
         distances, indices = self.index.search(vec, k)

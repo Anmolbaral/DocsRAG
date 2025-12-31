@@ -2,7 +2,7 @@ faiss-cpu
 openai
 numpy
 python-dotenv	
-pypdf
+pymupdf
 tenacity
 ragas
 langsmith
@@ -12,3 +12,4 @@ scikit-learn
 sentence-transformers
 ruff
 black
+rank-bm25
