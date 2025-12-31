@@ -24,10 +24,14 @@ class RAGPipeline:
         self.chunks = chunks
         self.bm25Index = BM25Index(self.texts)
         self._embedder_single = (
-            getattr(embedder, "get_embedding", None) if embedder else get_embedding_single
+            getattr(embedder, "get_embedding", None)
+            if embedder
+            else get_embedding_single
         )
         self._embedder_batch = (
-            getattr(embedder, "get_embeddings", None) if embedder else get_embedding_batch
+            getattr(embedder, "get_embeddings", None)
+            if embedder
+            else get_embedding_batch
         )
         self._chat_client = chat_client
         self._cache_file = cache_file
@@ -39,7 +43,9 @@ class RAGPipeline:
             self.embeddings = self._embedder_batch(self.texts)
             for i, t in enumerate(self.chunks):
                 self.db.add(
-                    self.embeddings[i], self.chunks[i]["text"], self.chunks[i]["metadata"]
+                    self.embeddings[i],
+                    self.chunks[i]["text"],
+                    self.chunks[i]["metadata"],
                 )
         self.add_to_cache()
 
@@ -67,10 +73,14 @@ class RAGPipeline:
         obj.texts = [chunk["text"] for chunk in obj.chunks]
         obj.bm25Index = BM25Index(obj.texts)
         obj._embedder_single = (
-            getattr(embedder, "get_embedding", None) if embedder else get_embedding_single
+            getattr(embedder, "get_embedding", None)
+            if embedder
+            else get_embedding_single
         )
         obj._embedder_batch = (
-            getattr(embedder, "get_embeddings", None) if embedder else get_embedding_batch
+            getattr(embedder, "get_embeddings", None)
+            if embedder
+            else get_embedding_batch
         )
         obj._chat_client = chat_client
         obj._cache_file = cacheFile
@@ -134,12 +144,14 @@ class RAGPipeline:
         # Convert BM25 results to same format as vector results
         bm25Candidates = []
         for idx, score, text in bm25Results:
-            bm25Candidates.append({
-                "text": text,
-                "metadata": self.chunks[idx]["metadata"],
-                "bm25_score": score,
-                "source": "bm25"
-            })
+            bm25Candidates.append(
+                {
+                    "text": text,
+                    "metadata": self.chunks[idx]["metadata"],
+                    "bm25_score": score,
+                    "source": "bm25",
+                }
+            )
 
         # 2. Vector search (k=20)
         vectorCandidates = self.db.search(queryEmb, VECTOR_K)
@@ -150,14 +162,14 @@ class RAGPipeline:
         # 3. Merge results (deduplicate by text)
         mergedCandidates = []
         seenTexts = set()
-        
+
         # Add BM25 results first
         for candidate in bm25Candidates:
             textKey = candidate["text"].strip().lower()
             if textKey not in seenTexts:
                 seenTexts.add(textKey)
                 mergedCandidates.append(candidate)
-        
+
         # Add vector results (skip duplicates)
         for candidate in vectorCandidates:
             textKey = candidate["text"].strip().lower()
