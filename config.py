@@ -1,25 +1,28 @@
 import tomllib
 from pathlib import Path
 from dataclasses import dataclass
-from typing import Optional
 
 @dataclass
 class EmbeddingConfig:
     model: str
 
+
 @dataclass
 class VectorDBConfig:
     dim: int
 
+
 @dataclass
 class GenerationConfig:
     model: str
+
 
 @dataclass
 class ChunkingConfig:
     chunkSize: int
     overlap: int
     minChunkChars: int
+
 
 @dataclass
 class RetrievalConfig:
@@ -28,21 +31,25 @@ class RetrievalConfig:
     rerankTopK: int
     contextTopK: int
 
+
 @dataclass
 class RerankerConfig:
     model: str
     topK: int
+
 
 @dataclass
 class ConversationConfig:
     maxHistory: int
     systemPrompt: str
 
+
 @dataclass
 class CategoryEmbeddingConfig:
     resume: str
     cover_letters: str
     misc_docs: str
+
 
 @dataclass
 class Config:
@@ -60,7 +67,7 @@ class Config:
         if not configPath.exists():
             projectRoot = Path(__file__).parent
             configPath = projectRoot / "config.toml"
-        
+
         try:
             with open(configPath, "rb") as f:
                 config = tomllib.load(f)

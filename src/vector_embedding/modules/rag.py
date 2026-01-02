@@ -8,6 +8,7 @@ import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
 from .bm25 import BM25Index
 from config import Config
+
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
 
@@ -15,7 +16,7 @@ class RAGPipeline:
     def __init__(
         self,
         chunks,
-        config:Config,
+        config: Config,
         embedder=None,
         chatClient=None,
         cacheFile="cache/embeddings.json",
@@ -62,7 +63,11 @@ class RAGPipeline:
 
     @classmethod
     def from_cache(
-        cls, config:Config, cacheFile="cache/embeddings.json", embedder=None, chatClient=None
+        cls,
+        config: Config,
+        cacheFile="cache/embeddings.json",
+        embedder=None,
+        chatClient=None,
     ):
         with open(cacheFile, "r") as f:
             metadata = json.load(f)
@@ -93,7 +98,7 @@ class RAGPipeline:
         # Cache category embeddings once during initialization
         obj.categoryEmbeddings = obj.create_category_embeddings()
 
-        # Initialize reranker   
+        # Initialize reranker
         obj.reranker = initialize_reranker(config)
 
         for i, chunk in enumerate(obj.chunks):
@@ -102,9 +107,15 @@ class RAGPipeline:
 
     def create_category_embeddings(self):
         categoryEmbedding = {
-            "resume": self._embedderSingle(self.config.categoryEmbedding.resume, self.config),
-            "cover_letters": self._embedderSingle(self.config.categoryEmbedding.cover_letters, self.config),
-            "misc_docs": self._embedderSingle(self.config.categoryEmbedding.misc_docs, self.config),
+            "resume": self._embedderSingle(
+                self.config.categoryEmbedding.resume, self.config
+            ),
+            "cover_letters": self._embedderSingle(
+                self.config.categoryEmbedding.cover_letters, self.config
+            ),
+            "misc_docs": self._embedderSingle(
+                self.config.categoryEmbedding.misc_docs, self.config
+            ),
         }
         return categoryEmbedding
 

@@ -4,15 +4,21 @@ from .modules.cache_manager import CacheManager
 from pathlib import Path
 from config import Config
 
+
 class DocumentRAGSystem:
     def __init__(
-        self, embedder=None, chatClient=None, cacheDir="cache", config:Config=None, dataDir="data"
+        self,
+        embedder=None,
+        chatClient=None,
+        cacheDir="cache",
+        config: Config = None,
+        dataDir="data",
     ):
         self.ragPipeline = None
         self.cacheManager = CacheManager(cacheDir, dataDir)
         self._embedder = embedder
         self._chatClient = chatClient
-        
+
         if config is None:
             projectRoot = Path(__file__).parent.parent.parent
             configPath = projectRoot / "config.toml"
@@ -58,11 +64,13 @@ class DocumentRAGSystem:
             for datafile in self.cacheManager.dataDir.rglob("*.pdf"):
                 datafile = str(datafile)
                 docs = load_pdf(datafile, config=self.config)
-                fileMetadata[datafile] = self.cacheManager.get_file_metadata_for_path(datafile)
+                fileMetadata[datafile] = self.cacheManager.get_file_metadata_for_path(
+                    datafile
+                )
                 allTexts.extend(docs)
-            
+
             self.cacheManager.save_file_metadata(fileMetadata)
-            
+
             return RAGPipeline(
                 allTexts,
                 embedder=self._embedder,
@@ -85,13 +93,16 @@ class DocumentRAGSystem:
     def incremental_update(self, fileChanges):
         """Update embeddings only for changed files"""
         cacheData = self.cacheManager.load_embeddings_cache()
-        
+
         existingChunks = cacheData["chunks"]
         existingEmbeddings = cacheData["embeddings"]
 
         for i, chunk in enumerate(existingChunks):
             chunkPath = chunk["metadata"]["path"]
-            if chunkPath in fileChanges["changedFiles"] or chunkPath in fileChanges["newFiles"]:
+            if (
+                chunkPath in fileChanges["changedFiles"]
+                or chunkPath in fileChanges["newFiles"]
+            ):
                 chunk["metadata"].update(
                     self.cacheManager.get_file_metadata_for_path(chunkPath)
                 )
