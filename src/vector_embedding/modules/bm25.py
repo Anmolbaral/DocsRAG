@@ -1,6 +1,7 @@
 from rank_bm25 import BM25Okapi
 import re
 import json
+from config import Config
 
 STOPWORDS = {
     "the",
@@ -38,8 +39,8 @@ STOPWORDS = {
 class BM25Index:
     def __init__(self, texts):
         self.texts = texts
-        self.tokenized_texts = self._tokenize(texts)
-        self.bm25 = BM25Okapi(self.tokenized_texts)
+        self.tokenizedTexts = self._tokenize(texts)
+        self.bm25 = BM25Okapi(self.tokenizedTexts)
 
     # Tokenize text: lowercase, extract words
     def _tokenize(self, texts):
@@ -55,12 +56,12 @@ class BM25Index:
         return tokenized
 
     # Search for top k results using BM25
-    def search(self, query: str, k: int = 5):
+    def search(self, query: str, config:Config):
         q = [
             x
             for x in re.findall(r"[a-z0-9]+", query.lower())
             if x not in STOPWORDS and len(x) >= 3
         ]
         scores = self.bm25.get_scores(q)
-        top = sorted(range(len(scores)), key=lambda i: scores[i], reverse=True)[:k]
+        top = sorted(range(len(scores)), key=lambda i: scores[i], reverse=True)[:config.retrieval.bm25TopK]
         return [(i, float(scores[i]), self.texts[i]) for i in top]

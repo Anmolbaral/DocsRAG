@@ -3,18 +3,24 @@ import fitz
 import re
 import os
 import unicodedata
+from typing import Optional
 from vector_embedding.modules.bm25 import BM25Index
 
 
 # Load and chunk a PDF into overlapping text chunks (5 sentences, 2 overlap).
 # Returns list of dicts with "text" and "metadata" (page, filename, category).
-def load_pdf(path):
+def load_pdf(path, config):
+    # Extract config values at the start to avoid repetition
+    chunkSize = config.chunking.chunkSize
+    overlap = config.chunking.overlap
+    minChunkChars = config.chunking.minChunkChars
+    
     try:
         if os.path.getsize(path) == 0:
             return []
 
         category = path.split("/")[-2]
-        groundTruth = category == "resume"
+        groundTruth = (category == "resume")
 
         doc = fitz.open(path)
         allChunks = []
@@ -29,13 +35,13 @@ def load_pdf(path):
 
             text = clean_text(text)
             allTexts.append(text)
-            chunkTexts = create_overlap_chunks(text, chunkSize=500, overlap=100)
+            chunkTexts = create_overlap_chunks(text, chunkSize=chunkSize, overlap=overlap)
 
             for chunkIndex, chunkText in enumerate(chunkTexts):
                 chunkText = chunkText.strip()
 
                 # drop junk/tiny chunks
-                if len(chunkText) < 200:
+                if len(chunkText) < minChunkChars:
                     continue
 
                 allChunks.append(
@@ -109,8 +115,8 @@ def create_overlap_chunks(text, chunkSize=500, overlap=100):
 
     while start < len(words):
         end = start + chunkSize
-        chunk_words = words[start:end]
-        chunks.append(" ".join(chunk_words))
+        chunkWords = words[start:end]
+        chunks.append(" ".join(chunkWords))
         start += chunkSize - overlap
 
         if start >= len(words):

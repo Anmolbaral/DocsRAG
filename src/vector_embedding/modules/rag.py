@@ -1,13 +1,13 @@
 from .embeddings import get_embedding_single, get_embedding_batch
 from .vectordb import VectorDB
-from .reranker import initialize_reranker, rerank_candidates as rerank_candidates_func
+from .reranker import initialize_reranker, rerank_candidates as rerankCandidatesFunc
 import openai
 import os
 import json
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
 from .bm25 import BM25Index
-
+from config import Config
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
 
@@ -15,32 +15,34 @@ class RAGPipeline:
     def __init__(
         self,
         chunks,
+        config:Config,
         embedder=None,
-        chat_client=None,
-        cache_file="cache/embeddings.json",
+        chatClient=None,
+        cacheFile="cache/embeddings.json",
     ):
-        self.db = VectorDB(dim=3072)
+        self.config = config
+        self.db = VectorDB(dim=config.vectorDB.dim)
         self.texts = [chunk["text"] for chunk in chunks]
         self.chunks = chunks
         self.bm25Index = BM25Index(self.texts)
-        self._embedder_single = (
-            getattr(embedder, "get_embedding", None)
+        self._embedderSingle = (
+            getattr(embedder, "get_embedding_single", None)
             if embedder
             else get_embedding_single
         )
-        self._embedder_batch = (
-            getattr(embedder, "get_embeddings", None)
+        self._embedderBatch = (
+            getattr(embedder, "get_embedding_batch", None)
             if embedder
             else get_embedding_batch
         )
-        self._chat_client = chat_client
-        self._cache_file = cache_file
+        self._chatClient = chatClient
+        self._cacheFile = cacheFile
         # If no texts are provided, return early
         if not self.texts or not self.chunks:
             self.embeddings = []
             self.chunks = []
         else:
-            self.embeddings = self._embedder_batch(self.texts)
+            self.embeddings = self._embedderBatch(self.texts, self.config)
             for i, t in enumerate(self.chunks):
                 self.db.add(
                     self.embeddings[i],
@@ -51,62 +53,58 @@ class RAGPipeline:
 
         # Adding conversation memory
         self.conversationHistory = []
-        self.maxHistory = 10
 
         # Cache category embeddings once during initialization
         self.categoryEmbeddings = self.create_category_embeddings()
 
         # Initialize reranker
-        self.reranker = initialize_reranker()
+        self.reranker = initialize_reranker(self.config)
 
     @classmethod
     def from_cache(
-        cls, cacheFile="cache/embeddings.json", embedder=None, chat_client=None
+        cls, config:Config, cacheFile="cache/embeddings.json", embedder=None, chatClient=None
     ):
         with open(cacheFile, "r") as f:
             metadata = json.load(f)
 
         obj = cls.__new__(cls)
-        obj.db = VectorDB(dim=3072)
+        obj.db = VectorDB(dim=config.vectorDB.dim)
         obj.chunks = metadata["chunks"]
         obj.embeddings = metadata["embeddings"]
         obj.texts = [chunk["text"] for chunk in obj.chunks]
         obj.bm25Index = BM25Index(obj.texts)
-        obj._embedder_single = (
-            getattr(embedder, "get_embedding", None)
+        obj._embedderSingle = (
+            getattr(embedder, "getEmbedding", None)
             if embedder
             else get_embedding_single
         )
-        obj._embedder_batch = (
-            getattr(embedder, "get_embeddings", None)
+        obj._embedderBatch = (
+            getattr(embedder, "getEmbeddings", None)
             if embedder
             else get_embedding_batch
         )
-        obj._chat_client = chat_client
-        obj._cache_file = cacheFile
+        obj._chatClient = chatClient
+        obj._cacheFile = cacheFile
+        obj.config = config
 
         # Intializing conversation history
         obj.conversationHistory = []
-        obj.maxHistory = 10
 
         # Cache category embeddings once during initialization
         obj.categoryEmbeddings = obj.create_category_embeddings()
 
-        # Initialize reranker
-        obj.reranker = initialize_reranker()
+        # Initialize reranker   
+        obj.reranker = initialize_reranker(config)
 
         for i, chunk in enumerate(obj.chunks):
             obj.db.add(obj.embeddings[i], chunk["text"], chunk["metadata"])
         return obj
 
     def create_category_embeddings(self):
-        category = {
-            "resume": "Professional career document containing work experience, technical skills, education background, projects, and quantified achievements. Formal tone with bullet points, dates, company names, job titles, and measurable accomplishments. Focus on qualifications, competencies, and professional history.",
-            "cover_letters": "Personal application letters expressing interest in specific job roles and companies. Conversational tone showing enthusiasm, motivation, and personal fit for positions. Contains phrases like 'excited about', 'passionate about', 'would love to', and explanations of why someone wants a particular role or company.",
-            "misc_docs": "Academic papers, essays, fellowship applications, and personal writings about broader topics like education, community impact, research, and personal philosophy. Reflective tone discussing values, social impact, academic work, and personal growth experiences.",
-        }
         categoryEmbedding = {
-            cat: self._embedder_single(desc) for cat, desc in category.items()
+            "resume": self._embedderSingle(self.config.categoryEmbedding.resume, self.config),
+            "cover_letters": self._embedderSingle(self.config.categoryEmbedding.cover_letters, self.config),
+            "misc_docs": self._embedderSingle(self.config.categoryEmbedding.misc_docs, self.config),
         }
         return categoryEmbedding
 
@@ -132,15 +130,10 @@ class RAGPipeline:
         if not self.chunks or not self.embeddings:
             raise ValueError("Cannot query: No documents loaded.")
 
-        queryEmb = self._embedder_single(query)
+        queryEmb = self._embedderSingle(query, self.config)
 
-        # Hybrid search parameters (fixed)
-        BM25_K = 20
-        VECTOR_K = 20
-        RERANK_TOP_N = 10
-
-        # 1. BM25 search (k=20)
-        bm25Results = self.bm25Index.search(query, k=BM25_K)
+        # 1. BM25 search
+        bm25Results = self.bm25Index.search(query, self.config)
         # Convert BM25 results to same format as vector results
         bm25Candidates = []
         for idx, score, text in bm25Results:
@@ -153,8 +146,8 @@ class RAGPipeline:
                 }
             )
 
-        # 2. Vector search (k=20)
-        vectorCandidates = self.db.search(queryEmb, VECTOR_K)
+        # 2. Vector search
+        vectorCandidates = self.db.search(queryEmb, k=self.config.retrieval.vectorTopK)
         # Add source identifier
         for candidate in vectorCandidates:
             candidate["source"] = "vector"
@@ -186,8 +179,8 @@ class RAGPipeline:
                         break
 
         # 4. Rerank top 10
-        results = rerank_candidates_func(
-            query, mergedCandidates, self.reranker, top_k=RERANK_TOP_N
+        results = rerankCandidatesFunc(
+            query, mergedCandidates, self.reranker, self.config
         )
 
         contextParts = []
@@ -197,21 +190,21 @@ class RAGPipeline:
             )
 
         context = "\n".join(contextParts)
-        messages = self.build_converation_context(context)
+        messages = self.build_conversation_context(context)
         messages.append({"role": "user", "content": query})
-        if self._chat_client is not None:
-            response_text = self._chat_client(messages)
-            self.add_to_conversation_history(query, response_text)
+        if self._chatClient is not None:
+            responseText = self._chatClient(messages)
+            self.add_to_conversation_history(query, responseText)
             # Add source information for custom chat client
             sources = [
                 f"{result['metadata']['category']}/{result['metadata']['filename']}"
                 for result in results[:3]
             ]
-            queryAnswer = response_text + f"\n\n-----Sources: {', '.join(sources)}"
+            queryAnswer = responseText + f"\n\n-----Sources: {', '.join(sources)}"
             return queryAnswer
 
         response = openai.chat.completions.create(
-            model="gpt-4o-mini", messages=messages
+            model=self.config.generation.model, messages=messages
         )
         self.add_to_conversation_history(query, response.choices[0].message.content)
         # Add source information for OpenAI response
@@ -225,12 +218,12 @@ class RAGPipeline:
         )
         return queryAnswer
 
-    def build_converation_context(self, documentContext):
+    def build_conversation_context(self, documentContext):
         conversationContext = []
         conversationContext.append(
             {
                 "role": "system",
-                "content": "You are a helpful assistant that can only answer questions from the context provided. Use conversation history to understant the references and context",
+                "content": self.config.conversation.systemPrompt,
             }
         )
         conversationContext.append(
@@ -249,31 +242,31 @@ class RAGPipeline:
                 "assistant": {"role": "assistant", "content": response},
             }
         )
-        if len(self.conversationHistory) > self.maxHistory:
+        if len(self.conversationHistory) > self.config.conversation.maxHistory:
             self.conversationHistory.pop(0)
 
-    def rerank_candidates(self, query: str, candidates: list, top_k: int = 10):
+    def rerank_candidates(self, query: str, candidates: list):
         """Rerank candidates using the reranker model"""
-        return rerank_candidates_func(query, candidates, self.reranker, top_k=top_k)
+        return rerankCandidatesFunc(query, candidates, self.reranker, self.config)
 
     def add_to_cache(self):
         """Ensure embeddings are JSON serializable (convert numpy arrays to lists)"""
-        serializable_embeddings = []
+        serializableEmbeddings = []
         for emb in self.embeddings:
             if isinstance(emb, np.ndarray):
-                serializable_embeddings.append(emb.tolist())
+                serializableEmbeddings.append(emb.tolist())
             else:
                 try:
-                    serializable_embeddings.append(np.asarray(emb).tolist())
+                    serializableEmbeddings.append(np.asarray(emb).tolist())
                 except Exception:
-                    serializable_embeddings.append(emb)
+                    serializableEmbeddings.append(emb)
 
         cacheData = {
             "chunks": self.chunks,
-            "embeddings": serializable_embeddings,
+            "embeddings": serializableEmbeddings,
         }
-        with open(self._cache_file, "w") as f:
+        with open(self._cacheFile, "w") as f:
             json.dump(cacheData, f, indent=2)
 
-    def search_bm25(self, query: str, k: int = 20):
-        return self.bm25Index.search(query, k)
+    def search_bm25(self, query: str):
+        return self.bm25Index.search(query, self.config)

@@ -21,8 +21,8 @@ class VectorDB:
 
     # Search for k most similar vectors. Returns list of dicts with "text",
     # "metadata", and "distance" (lower distance = more similar).
-    def search(self, query_vector, k=5):
-        vec = np.array([query_vector]).astype("float32")
+    def search(self, queryVector, k=5):
+        vec = np.array([queryVector]).astype("float32")
         distances, indices = self.index.search(vec, k)
         results = []
         for idx, match in enumerate(indices[0]):
