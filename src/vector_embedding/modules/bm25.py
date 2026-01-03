@@ -1,6 +1,7 @@
 from rank_bm25 import BM25Okapi
 import re
 from config import Config
+import heapq
 
 STOPWORDS = {
     "the",
@@ -56,13 +57,12 @@ class BM25Index:
 
     # Search for top k results using BM25
     def search(self, query: str, config: Config):
-        q = [
-            x
-            for x in re.findall(r"[a-z0-9]+", query.lower())
-            if x not in STOPWORDS and len(x) >= 3
-        ]
-        scores = self.bm25.get_scores(q)
-        top = sorted(range(len(scores)), key=lambda i: scores[i], reverse=True)[
-            : config.retrieval.bm25TopK
-        ]
-        return [(i, float(scores[i]), self.texts[i]) for i in top]
+        minHeap = []
+        heapq.heapify(minHeap)
+        scores = self.bm25.get_scores(query)
+        for i, score in enumerate(scores):
+            if len(minHeap) < config.retrieval.bm25TopK:
+                heapq.heappush(minHeap, (score, i))
+            else:
+                heapq.heappushpop(minHeap, (score, i))
+        return [(i, float(score), self.texts[i]) for score, i in minHeap]

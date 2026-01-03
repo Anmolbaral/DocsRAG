@@ -44,19 +44,12 @@ class RAGPipeline:
             self.chunks = []
         else:
             self.embeddings = self._embedderBatch(self.texts, self.config)
-            for i, t in enumerate(self.chunks):
-                self.db.add(
-                    self.embeddings[i],
-                    self.chunks[i]["text"],
-                    self.chunks[i]["metadata"],
-                )
+            metadataList = [chunk["metadata"] for chunk in self.chunks]
+            self.db.add(self.embeddings, self.texts, metadataList)
         self.add_to_cache()
 
         # Adding conversation memory
         self.conversationHistory = []
-
-        # Cache category embeddings once during initialization
-        self.categoryEmbeddings = self.create_category_embeddings()
 
         # Initialize reranker
         self.reranker = initialize_reranker(self.config)
@@ -79,12 +72,12 @@ class RAGPipeline:
         obj.texts = [chunk["text"] for chunk in obj.chunks]
         obj.bm25Index = BM25Index(obj.texts)
         obj._embedderSingle = (
-            getattr(embedder, "getEmbedding", None)
+            getattr(embedder, "get_embedding_single", None)
             if embedder
             else get_embedding_single
         )
         obj._embedderBatch = (
-            getattr(embedder, "getEmbeddings", None)
+            getattr(embedder, "get_mbedding_batch", None)
             if embedder
             else get_embedding_batch
         )
@@ -95,49 +88,15 @@ class RAGPipeline:
         # Intializing conversation history
         obj.conversationHistory = []
 
-        # Cache category embeddings once during initialization
-        obj.categoryEmbeddings = obj.create_category_embeddings()
-
         # Initialize reranker
         obj.reranker = initialize_reranker(config)
 
-        for i, chunk in enumerate(obj.chunks):
-            obj.db.add(obj.embeddings[i], chunk["text"], chunk["metadata"])
+        metadataList = [chunk["metadata"] for chunk in obj.chunks]  
+        obj.db.add(obj.embeddings, obj.texts, metadataList)
         return obj
 
-    def create_category_embeddings(self):
-        categoryEmbedding = {
-            "resume": self._embedderSingle(
-                self.config.categoryEmbedding.resume, self.config
-            ),
-            "cover_letters": self._embedderSingle(
-                self.config.categoryEmbedding.cover_letters, self.config
-            ),
-            "misc_docs": self._embedderSingle(
-                self.config.categoryEmbedding.misc_docs, self.config
-            ),
-        }
-        return categoryEmbedding
 
-    def calculate_confidence(self, queryEmb, categoryEmbedding, debug=False):
-        categoryScore = {
-            cat: cosine_similarity([queryEmb], [categoryEmbedding[cat]])[0][0]
-            for cat in categoryEmbedding
-        }
-
-        sortedScore = sorted(categoryScore.values(), reverse=True)
-        if debug:
-            print(f"Sorted Score: {sortedScore}")
-
-        relativeConfidence = (
-            sortedScore[0] - sortedScore[1] if len(sortedScore) > 1 else sortedScore[0]
-        )
-        if debug:
-            print(f"Relative Confidence: {relativeConfidence}")
-
-        return relativeConfidence, categoryScore
-
-    def ask(self, query, debug=False):
+    def ask(self, query):
         if not self.chunks or not self.embeddings:
             raise ValueError("Cannot query: No documents loaded.")
 

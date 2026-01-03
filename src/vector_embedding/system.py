@@ -3,6 +3,8 @@ from .modules.loader import load_pdf
 from .modules.cache_manager import CacheManager
 from pathlib import Path
 from config import Config
+from typing import Union, Tuple
+import time
 
 
 class DocumentRAGSystem:
@@ -82,35 +84,42 @@ class DocumentRAGSystem:
             print(f"Error processing files: {e}")
             raise e
 
-    def query(self, query: str) -> str:
+    def query(self, query: str, showTiming: bool = True) -> Union[Tuple[str, float], str]:
         """Process a query and return the answer"""
+        
         if not self.ragPipeline:
             raise ValueError("System not initialized. Call initialize() first.")
         if not query or not query.strip():
             raise ValueError("Query cannot be empty")
-        return self.ragPipeline.ask(query.strip())
+        
+        startTime = time.time()
+        answer = self.ragPipeline.ask(query.strip())
+        elapsedTime = time.time() - startTime
+        
+        if showTiming:
+            return answer, elapsedTime
+        return answer
 
+    
     def incremental_update(self, fileChanges):
         """Update embeddings only for changed files"""
-        cacheData = self.cacheManager.load_embeddings_cache()
-
-        existingChunks = cacheData["chunks"]
-        existingEmbeddings = cacheData["embeddings"]
-
-        for i, chunk in enumerate(existingChunks):
-            chunkPath = chunk["metadata"]["path"]
-            if (
-                chunkPath in fileChanges["changedFiles"]
-                or chunkPath in fileChanges["newFiles"]
-            ):
-                chunk["metadata"].update(
-                    self.cacheManager.get_file_metadata_for_path(chunkPath)
-                )
-
+        keptChunks, filesToUpdate = self.cacheManager.get_updated_chunks(fileChanges)
+        
+        # Load new/changed files
+        newChunks = []
+        for datafile in self.cacheManager.dataDir.rglob("*.pdf"):
+            datafile = str(datafile)
+            if datafile in filesToUpdate:
+                docs = load_pdf(datafile, config=self.config)
+                newChunks.extend(docs)
+        
+        # Combine: kept chunks (unchanged files) + new chunks (changed/new files)
+        allChunks = keptChunks + newChunks
+        
         self.cacheManager.update_file_metadata(fileChanges)
-
+        
         return RAGPipeline(
-            existingChunks,
+            allChunks,
             config=self.config,
             embedder=self._embedder,
             chatClient=self._chatClient,

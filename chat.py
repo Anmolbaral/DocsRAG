@@ -1,9 +1,3 @@
-#!/usr/bin/env python3
-"""
-Interactive terminal chat interface for Document RAG System
-Run with: python chat.py
-"""
-
 import sys
 from src.vector_embedding.system import DocumentRAGSystem
 
@@ -44,13 +38,14 @@ def main():
 
                 # Process query
                 print("\n🤔 Thinking...")
-                response = system.query(query)
+                response, queryTime = system.query(query, showTiming=True)
 
                 # Display response
                 print("\n🤖 Assistant:")
                 print("-" * 60)
                 print(response)
                 print("-" * 60)
+                print(f"⏱️  Query processed in {queryTime:.2f} seconds")
 
             except KeyboardInterrupt:
                 print("\n\n👋 Goodbye!")

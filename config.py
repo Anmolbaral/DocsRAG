@@ -45,13 +45,6 @@ class ConversationConfig:
 
 
 @dataclass
-class CategoryEmbeddingConfig:
-    resume: str
-    cover_letters: str
-    misc_docs: str
-
-
-@dataclass
 class Config:
     embedding: EmbeddingConfig
     vectorDB: VectorDBConfig
@@ -60,7 +53,6 @@ class Config:
     retrieval: RetrievalConfig
     reranker: RerankerConfig
     conversation: ConversationConfig
-    categoryEmbedding: CategoryEmbeddingConfig
 
     @classmethod
     def from_file(cls, configPath: Path) -> "Config":
@@ -82,5 +74,4 @@ class Config:
             retrieval=RetrievalConfig(**config["retrieval"]),
             reranker=RerankerConfig(**config["reranker"]),
             conversation=ConversationConfig(**config["conversation"]),
-            categoryEmbedding=CategoryEmbeddingConfig(**config["categoryEmbedding"]),
         )

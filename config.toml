@@ -25,8 +25,3 @@ topK = 10
 [conversation]
 maxHistory = 10
 systemPrompt = "You are a helpful assistant that can only answer questions from the context provided. Use conversation history to understant the references and context"
-
-[categoryEmbedding]
-resume = "Professional career document containing work experience, technical skills, education background, projects, and quantified achievements. Formal tone with bullet points, dates, company names, job titles, and measurable accomplishments. Focus on qualifications, competencies, and professional history."
-cover_letters = "Personal application letters expressing interest in specific job roles and companies. Conversational tone showing enthusiasm, motivation, and personal fit for positions. Contains phrases like 'excited about', 'passionate about', 'would love to', and explanations of why someone wants a particular role or company."
-misc_docs = "Academic papers, essays, fellowship applications, and personal writings about broader topics like education, community impact, research, and personal philosophy. Reflective tone discussing values, social impact, academic work, and personal growth experiences."
