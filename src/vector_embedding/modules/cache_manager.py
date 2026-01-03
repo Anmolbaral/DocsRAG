@@ -54,8 +54,12 @@ class CacheManager:
                 file = str(file)
                 if file not in cacheMetadata.keys():
                     newFiles.append(file)
-                elif get_file_hash(file) != cacheMetadata[file]["fileHash"]:
-                    changedFiles.append(file)
+                else:
+                    currMtime = os.path.getmtime(file)
+                    cacheMtime = cacheMetadata[file]["fileModifiedTime"]
+                    if cacheMtime != currMtime:
+                        if get_file_hash(file) != cacheMetadata[file]["fileHash"]:
+                            changedFiles.append(file)
 
             return {
                 "isValid": True,
@@ -111,20 +115,21 @@ class CacheManager:
             "fileModifiedTime": os.path.getmtime(filePath),
             "fileHash": get_file_hash(filePath),
         }
-    
+
     def get_updated_chunks(self, fileChanges):
         """Filter chunks based on file changes and return chunks to keep and files to update"""
         cacheData = self.load_embeddings_cache()
         existingChunks = cacheData["chunks"]
-        
+
         filesToRemove = set(fileChanges["removedFiles"])
         filesToUpdate = set(fileChanges["changedFiles"] + fileChanges["newFiles"])
-        
+
         # Filter out removed files and changed files (changed files will be reloaded)
         keptChunks = [
-            chunk for chunk in existingChunks
+            chunk
+            for chunk in existingChunks
             if chunk["metadata"]["path"] not in filesToRemove
             and chunk["metadata"]["path"] not in filesToUpdate
         ]
-        
+
         return keptChunks, filesToUpdate

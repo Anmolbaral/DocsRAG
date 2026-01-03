@@ -91,10 +91,9 @@ class RAGPipeline:
         # Initialize reranker
         obj.reranker = initialize_reranker(config)
 
-        metadataList = [chunk["metadata"] for chunk in obj.chunks]  
+        metadataList = [chunk["metadata"] for chunk in obj.chunks]
         obj.db.add(obj.embeddings, obj.texts, metadataList)
         return obj
-
 
     def ask(self, query):
         if not self.chunks or not self.embeddings:

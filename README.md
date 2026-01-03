@@ -100,7 +100,7 @@ model = "gpt-4o-mini"
 
 ### Embedding Model
 ```python
-model = "text-embedding-3-large"
+model = "text-embedding-3-small"
 ```
 
 Note: The VectorDB dimension is hardcoded to 3072 to match text-embedding-3-large. If changing the embedding model, you must also update `VectorDB(dim=...)` in `rag.py` to match the model's output dimensions (e.g., 1536 for text-embedding-3-small).

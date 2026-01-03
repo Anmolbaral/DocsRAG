@@ -2,6 +2,7 @@ import tomllib
 from pathlib import Path
 from dataclasses import dataclass
 
+
 @dataclass
 class EmbeddingConfig:
     model: str

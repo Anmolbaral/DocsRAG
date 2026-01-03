@@ -84,27 +84,28 @@ class DocumentRAGSystem:
             print(f"Error processing files: {e}")
             raise e
 
-    def query(self, query: str, showTiming: bool = True) -> Union[Tuple[str, float], str]:
+    def query(
+        self, query: str, showTiming: bool = True
+    ) -> Union[Tuple[str, float], str]:
         """Process a query and return the answer"""
-        
+
         if not self.ragPipeline:
             raise ValueError("System not initialized. Call initialize() first.")
         if not query or not query.strip():
             raise ValueError("Query cannot be empty")
-        
+
         startTime = time.time()
         answer = self.ragPipeline.ask(query.strip())
         elapsedTime = time.time() - startTime
-        
+
         if showTiming:
             return answer, elapsedTime
         return answer
 
-    
     def incremental_update(self, fileChanges):
         """Update embeddings only for changed files"""
         keptChunks, filesToUpdate = self.cacheManager.get_updated_chunks(fileChanges)
-        
+
         # Load new/changed files
         newChunks = []
         for datafile in self.cacheManager.dataDir.rglob("*.pdf"):
@@ -112,12 +113,12 @@ class DocumentRAGSystem:
             if datafile in filesToUpdate:
                 docs = load_pdf(datafile, config=self.config)
                 newChunks.extend(docs)
-        
+
         # Combine: kept chunks (unchanged files) + new chunks (changed/new files)
         allChunks = keptChunks + newChunks
-        
+
         self.cacheManager.update_file_metadata(fileChanges)
-        
+
         return RAGPipeline(
             allChunks,
             config=self.config,

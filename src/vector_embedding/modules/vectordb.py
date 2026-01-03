@@ -6,8 +6,8 @@ import numpy as np
 class VectorDB:
     def __init__(self, dim):
         self.index = faiss.IndexHNSWFlat(dim, 32)
-        self.texts = [] # list of text strings
-        self.metadata = [] # list of metadata dictionaries
+        self.texts = []  # list of text strings
+        self.metadata = []  # list of metadata dictionaries
 
     def add(self, vectors, texts, metadata=None):
         vectors = np.array(vectors).astype("float32")
