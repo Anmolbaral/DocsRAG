@@ -6,14 +6,17 @@ Retrieval-Augmented Generation (RAG) system for intelligent question-answering o
 
 - **Hybrid Search**: Combines BM25 keyword search with semantic vector search for improved retrieval
 - **Multi-Document Processing**: Automatically processes all PDF files in the data directory
-- **Text Chunking**: Word-based overlapping chunks (500 words, 100 overlap) for context preservation
+- **Intelligent Caching**: Incremental updates only process changed files, reducing processing time
+- **Configuration Management**: Centralized configuration via `config.toml` for easy customization
+- **Text Chunking**: Word-based overlapping chunks with configurable size and overlap
 - **Vector Search**: FAISS IndexHNSWFlat for approximate nearest neighbor search
 - **BM25 Search**: Keyword-based retrieval using rank-bm25 for exact term matching
 - **Reranking**: Cross-encoder reranker improves retrieval relevance
 - **Metadata Tracking**: Maintains source information (filename, page number, category)
-- **Terminal Chat Interface**: Interactive command-line chat for real-time Q&A
+- **Terminal Chat Interface**: Interactive command-line chat for real-time Q&A with query timing
 - **Text Cleaning**: Handles PDF formatting issues with regex preprocessing
-- **Embedding Model**: Uses "text-embedding-3-large" with 3072 dimensions
+- **Conversation History**: Maintains context across multiple queries
+- **Dynamic Embedding Dimensions**: Automatically adjusts vector database dimensions based on embedding model
 
 
 
@@ -42,8 +45,12 @@ Retrieval-Augmented Generation (RAG) system for intelligent question-answering o
    OPENAI_API_KEY=your_openai_api_key_here
    ```
 
-5. Add your documents
-   Place your PDF files in the `data/` directory
+5. Configure the system (optional)
+   Edit `config.toml` to customize embedding models, chunk sizes, retrieval parameters, etc.
+   The system will use sensible defaults if the config file is not found.
+
+6. Add your documents
+   Place your PDF files in the `data/` directory (organized in subdirectories like `resume/`, `cover_letters/`, `misc_docs/`)
 
 ## Usage
 
@@ -67,51 +74,127 @@ Import and use as a library:
 ```python
 from src.vector_embedding.system import DocumentRAGSystem
 
+# Initialize system (automatically loads config.toml)
 system = DocumentRAGSystem()
 system.initialize()
+
+# Query the system
 answer = system.query("What is your question?")
+
+# Query with timing information
+answer, queryTime = system.query("What is your question?", showTiming=True)
+print(f"Query processed in {queryTime:.2f} seconds")
+```
+
+### Custom Configuration
+
+You can also pass a custom config:
+
+```python
+from src.vector_embedding.system import DocumentRAGSystem
+from config import Config
+from pathlib import Path
+
+# Load custom config
+customConfig = Config.from_file(Path("custom_config.toml"))
+system = DocumentRAGSystem(config=customConfig)
+system.initialize()
 ```
 
 ## Configuration
 
-### Chunking Parameters
-```python
-chunkSize = 500    # Number of words per chunk
-overlap = 100      # Number of overlapping words between chunks
-```
+All configuration is managed through `config.toml` in the project root. The system automatically loads this file on initialization.
 
-### Search Parameters
-```python
-# Hybrid search configuration
-BM25_K = 20          # Number of BM25 keyword search results
-VECTOR_K = 20        # Number of vector semantic search results
-RERANK_TOP_N = 10    # Final number of reranked results sent to LLM
+### Configuration File Structure
 
-# LLM Model
-model = "gpt-4o-mini"
-```
+```toml
+[embedding]
+model = "text-embedding-3-small"  # OpenAI embedding model
 
-**How it works:**
-1. BM25 retrieves top 20 candidates based on keyword matching
-2. Vector search retrieves top 20 candidates based on semantic similarity
-3. Results are merged and deduplicated
-4. Cross-encoder reranks the merged candidates
-5. Top 10 reranked results are used as context for the LLM
+[vectorDB]
+dim = 1536  # Vector dimension (automatically matches embedding model)
 
-### Embedding Model
-```python
-model = "text-embedding-3-small"
-```
+[generation]
+model = "gpt-4o-mini"  # LLM model for response generation
 
-Note: The VectorDB dimension is hardcoded to 3072 to match text-embedding-3-large. If changing the embedding model, you must also update `VectorDB(dim=...)` in `rag.py` to match the model's output dimensions (e.g., 1536 for text-embedding-3-small).
+[chunking]
+chunkSize = 500        # Number of words per chunk
+overlap = 100          # Number of overlapping words between chunks
+minChunkChars = 200    # Minimum characters required for a chunk
 
-### Reranker Model
-```python
+[retrieval]
+vectorTopK = 40        # Number of vector search results
+bm25TopK = 40          # Number of BM25 keyword search results
+rerankTopK = 25        # Number of candidates to rerank
+contextTopK = 5        # Final number of results sent to LLM
+
+[reranker]
 model = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+topK = 10
+
+[conversation]
+maxHistory = 10       # Maximum conversation history entries
+systemPrompt = "You are a helpful assistant..."
+```
+
+### How Retrieval Works
+
+1. **BM25 Search**: Retrieves top `bm25TopK` candidates based on keyword matching
+2. **Vector Search**: Retrieves top `vectorTopK` candidates based on semantic similarity
+3. **Merge & Deduplicate**: Combines results from both methods, removing duplicates
+4. **Reranking**: Cross-encoder reranks the top `rerankTopK` merged candidates
+5. **Context Selection**: Top `contextTopK` reranked results are used as context for the LLM
+
+### Embedding Models
+
+Supported models and their dimensions:
+- `text-embedding-3-small`: 1536 dimensions
+- `text-embedding-3-large`: 3072 dimensions
+
+The vector database dimension is automatically configured based on the embedding model specified in `config.toml`. No manual dimension updates needed!
+
+### Cache Management
+
+The system includes intelligent caching:
+- **Incremental Updates**: Only processes files that have changed
+- **File Tracking**: Monitors file modifications using MD5 hashes
+- **Automatic Detection**: Identifies new, changed, and removed files
+- **Cache Validation**: Ensures cache consistency with current files
+
+Cache files are stored in the `cache/` directory:
+- `embeddings.json`: Cached embeddings and chunks
+- `file_metadata.json`: File modification tracking
+
+## Project Structure
+
+```
+Vector Embedding/
+├── config.toml              # Configuration file
+├── config.py                # Configuration loader
+├── chat.py                  # Interactive chat interface
+├── data/                    # Document directory
+│   ├── resume/              # Resume PDFs
+│   ├── cover_letters/       # Cover letter PDFs
+│   └── misc_docs/          # Other documents
+├── cache/                   # Cache directory
+│   ├── embeddings.json     # Cached embeddings
+│   └── file_metadata.json  # File tracking metadata
+└── src/vector_embedding/
+    ├── system.py            # Main system class
+    └── modules/
+        ├── rag.py           # RAG pipeline
+        ├── loader.py        # PDF loading and chunking
+        ├── embeddings.py    # Embedding generation
+        ├── vectordb.py      # Vector database
+        ├── bm25.py          # BM25 search
+        ├── reranker.py      # Cross-encoder reranking
+        ├── cache_manager.py # Cache management
+        └── hashing.py       # File hashing utilities
 ```
 
 ## Dependencies
 
+Core dependencies:
 - **faiss-cpu**: Vector similarity search
 - **openai**: Embedding generation and LLM inference
 - **sentence-transformers**: Cross-encoder reranking
@@ -121,11 +204,19 @@ model = "cross-encoder/ms-marco-MiniLM-L-6-v2"
 - **python-dotenv**: Environment variable management
 - **pypdf**: PDF text extraction
 - **PyMuPDF (fitz)**: Advanced PDF text extraction
+
+Optional dependencies:
 - **tenacity**: Retry logic
 - **ragas**: RAG evaluation
 - **langchain**: Framework components
 - **langchain-openai**: LangChain OpenAI integration
 - **langsmith**: LangChain monitoring
+
+## Code Conventions
+
+- **Function names**: `snake_case` (e.g., `get_embedding_single`, `load_pdf`)
+- **Variable names**: `camelCase` (e.g., `allChunks`, `fileMetadata`)
+- **Class names**: `PascalCase` (e.g., `RAGPipeline`, `DocumentRAGSystem`)
 
 ## License
 
