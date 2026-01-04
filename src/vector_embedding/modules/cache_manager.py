@@ -16,8 +16,7 @@ class CacheManager:
         """Check which files have changed, are new, or were removed"""
         changedFiles = []
         newFiles = []
-        removedFiles = []
-        isValid = True
+        removedFiles = set()
 
         try:
             metadataPath = f"{self.cacheDir}/file_metadata.json"
@@ -25,10 +24,9 @@ class CacheManager:
 
             if not os.path.exists(metadataPath) or not os.path.exists(embeddingsPath):
                 return {
-                    "isValid": False,
                     "changedFiles": [],
                     "newFiles": [],
-                    "removedFiles": [],
+                    "removedFiles": set(),
                 }
 
             if (
@@ -36,10 +34,9 @@ class CacheManager:
                 or os.path.getsize(embeddingsPath) == 0
             ):
                 return {
-                    "isValid": False,
                     "changedFiles": [],
                     "newFiles": [],
-                    "removedFiles": [],
+                    "removedFiles": set(),
                 }
 
             with open(metadataPath, "r") as f:
@@ -48,7 +45,7 @@ class CacheManager:
             currentFiles = {str(file) for file in self.dataDir.rglob("*.pdf")}
             cachedFiles = set(cacheMetadata.keys())
 
-            removedFiles = list(cachedFiles - currentFiles)
+            removedFiles = cachedFiles - currentFiles
 
             for file in currentFiles:
                 file = str(file)
@@ -62,7 +59,6 @@ class CacheManager:
                             changedFiles.append(file)
 
             return {
-                "isValid": True,
                 "changedFiles": changedFiles,
                 "newFiles": newFiles,
                 "removedFiles": removedFiles,
@@ -70,10 +66,9 @@ class CacheManager:
         except Exception as e:
             print(f"Error checking file changes: {e}")
             return {
-                "isValid": False,
                 "changedFiles": [],
                 "newFiles": [],
-                "removedFiles": [],
+                "removedFiles": set(),
             }
 
     def load_embeddings_cache(self):

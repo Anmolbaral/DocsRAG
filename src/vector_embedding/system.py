@@ -32,8 +32,7 @@ class DocumentRAGSystem:
         """Initialize RAGPipeline once at startup"""
         fileChanges = self.cacheManager.get_file_changes()
         if (
-            fileChanges["isValid"]
-            and not fileChanges["changedFiles"]
+            not fileChanges["changedFiles"]
             and not fileChanges["newFiles"]
             and not fileChanges["removedFiles"]
         ):
@@ -44,7 +43,7 @@ class DocumentRAGSystem:
                 embedder=self._embedder,
                 chatClient=self._chatClient,
             )
-        elif fileChanges["isValid"] and (
+        elif (
             fileChanges["changedFiles"]
             or fileChanges["newFiles"]
             or fileChanges["removedFiles"]

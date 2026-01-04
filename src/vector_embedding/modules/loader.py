@@ -5,7 +5,7 @@ import unicodedata
 from config import Config
 
 
-# Load and chunk a PDF into overlapping text chunks (5 sentences, 2 overlap).
+# Load and chunk a PDF into overlapping text chunks
 # Returns list of dicts with "text" and "metadata" (page, filename, category).
 def load_pdf(path, config):
     # Extract config values at the start to avoid repetition
@@ -18,7 +18,6 @@ def load_pdf(path, config):
             return []
 
         category = path.split("/")[-2]
-        groundTruth = category == "resume"
 
         doc = fitz.open(path)
         allChunks = []
@@ -52,7 +51,6 @@ def load_pdf(path, config):
                             "path": path,
                             "category": category,
                             "filename": path.split("/")[-1],
-                            "isGroundTruth": groundTruth,
                             "chunkId": chunkIndex,
                         },
                     }

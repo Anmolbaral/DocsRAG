@@ -13,9 +13,9 @@ overlap = 100
 minChunkChars = 200
 
 [retrieval]
-vectorTopK = 40
-bm25TopK = 40
-rerankTopK = 25
+vectorTopK = 20
+bm25TopK = 20
+rerankTopK = 10
 contextTopK = 5
 
 [reranker]

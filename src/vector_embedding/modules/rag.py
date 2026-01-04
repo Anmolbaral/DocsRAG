@@ -1,14 +1,11 @@
 from .embeddings import get_embedding_single, get_embedding_batch
 from .vectordb import VectorDB
-from .reranker import initialize_reranker, rerank_candidates as rerankCandidatesFunc
+from .reranker import initialize_reranker, rerank_candidates
 import openai
-import os
 import json
 import numpy as np
 from .bm25 import BM25Index
 from config import Config
-
-openai.api_key = os.getenv("OPENAI_API_KEY")
 
 
 class RAGPipeline:
@@ -76,7 +73,7 @@ class RAGPipeline:
             else get_embedding_single
         )
         obj._embedderBatch = (
-            getattr(embedder, "get_mbedding_batch", None)
+            getattr(embedder, "get_embedding_batch", None)
             if embedder
             else get_embedding_batch
         )
@@ -149,11 +146,10 @@ class RAGPipeline:
                         ]
 
         # 4. Rerank top 10
-        results = rerankCandidatesFunc(
-            query, mergedCandidates, self.reranker, self.config
-        )
+        results = rerank_candidates(query, mergedCandidates, self.reranker, self.config)
 
         contextParts = []
+
         for result in results:
             contextParts.append(
                 f"Page {result['metadata']['page']} - {result['metadata']['filename']}: {result['text']}"
@@ -162,6 +158,7 @@ class RAGPipeline:
         context = "\n".join(contextParts)
         messages = self.build_conversation_context(context)
         messages.append({"role": "user", "content": query})
+
         if self._chatClient is not None:
             responseText = self._chatClient(messages)
             self.add_to_conversation_history(query, responseText)
@@ -177,16 +174,7 @@ class RAGPipeline:
             model=self.config.generation.model, messages=messages
         )
         self.add_to_conversation_history(query, response.choices[0].message.content)
-        # Add source information for OpenAI response
-        sources = [
-            f"{result['metadata']['category']}/{result['metadata']['filename']}"
-            for result in results[:3]
-        ]
-        queryAnswer = (
-            response.choices[0].message.content
-            + f"\n\n-----Sources: {', '.join(sources)}"
-        )
-        return queryAnswer
+        return response.choices[0].message.content
 
     def build_conversation_context(self, documentContext):
         conversationContext = []
@@ -214,10 +202,6 @@ class RAGPipeline:
         )
         if len(self.conversationHistory) > self.config.conversation.maxHistory:
             self.conversationHistory.pop(0)
-
-    def rerank_candidates(self, query: str, candidates: list):
-        """Rerank candidates using the reranker model"""
-        return rerankCandidatesFunc(query, candidates, self.reranker, self.config)
 
     def add_to_cache(self):
         """Ensure embeddings are JSON serializable (convert numpy arrays to lists)"""
