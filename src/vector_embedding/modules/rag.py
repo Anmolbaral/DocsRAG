@@ -5,7 +5,6 @@ import openai
 import os
 import json
 import numpy as np
-from sklearn.metrics.pairwise import cosine_similarity
 from .bm25 import BM25Index
 from config import Config
 
@@ -124,12 +123,14 @@ class RAGPipeline:
         # 3. Merge results (deduplicate by text)
         mergedCandidates = []
         seenTexts = set()
+        textToCandidate = {}
 
         # Add BM25 results first
         for candidate in bm25Candidates:
             textKey = candidate["text"].strip().lower()
             if textKey not in seenTexts:
                 seenTexts.add(textKey)
+                textToCandidate[textKey] = candidate
                 mergedCandidates.append(candidate)
 
         # Add vector results (skip duplicates)
@@ -139,13 +140,13 @@ class RAGPipeline:
                 seenTexts.add(textKey)
                 mergedCandidates.append(candidate)
             else:
-                # If duplicate, mark as hybrid (found by both methods)
-                for existing in mergedCandidates:
-                    if existing["text"].strip().lower() == textKey:
-                        existing["source"] = "hybrid"
-                        if "distance" in candidate:
-                            existing["vector_distance"] = candidate["distance"]
-                        break
+                # O(1) lookup
+                if textKey in textToCandidate:
+                    textToCandidate[textKey]["source"] = "hybrid"
+                    if "distance" in candidate:
+                        textToCandidate[textKey]["vector_distance"] = candidate[
+                            "distance"
+                        ]
 
         # 4. Rerank top 10
         results = rerankCandidatesFunc(

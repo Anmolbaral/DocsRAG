@@ -202,7 +202,6 @@ Core dependencies:
 - **numpy**: Numerical computations
 - **scikit-learn**: Similarity calculations
 - **python-dotenv**: Environment variable management
-- **pypdf**: PDF text extraction
 - **PyMuPDF (fitz)**: Advanced PDF text extraction
 
 Optional dependencies:

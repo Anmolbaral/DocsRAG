@@ -4,7 +4,7 @@ from src.vector_embedding.system import DocumentRAGSystem
 
 def main():
     print("=" * 60)
-    print("🚀 Document RAG System - Interactive Chat")
+    print("🚀 Interactive Chat Interface")
     print("=" * 60)
     print("\nInitializing system...")
 
