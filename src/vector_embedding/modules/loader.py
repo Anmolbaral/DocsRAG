@@ -28,6 +28,8 @@ def load_pdf(path, config: Config):
             text = text.strip()
             if not text:
                 continue
+            
+            text = clean_text(text)
 
             chunkTexts = create_overlap_chunks(
                 text, chunkSize=chunkSize, overlap=overlap
@@ -63,7 +65,7 @@ def load_pdf(path, config: Config):
 # the text coming from the PDF before chunking them
 def clean_text(text: str) -> str:
     # Remove zero-width characters (common in PDFs)
-    text = re.sub(r"[\u2013\u2019\u200B\u200C\u200D\uFEFF\u25cf\u200b\u200c\u200d\n\t\r]", "", text)
+    text = re.sub(r"[\u2013\u2019\u200B\u200C\u200D\uFEFF\u200b\u200c\u200d\n\t\r]", "", text)
 
     # Normalize unicode (fix weird characters)
     text = unicodedata.normalize("NFKC", text)
