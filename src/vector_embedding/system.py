@@ -16,8 +16,12 @@ class DocumentRAGSystem:
         cacheDir="cache",
         config: Config = None,
         dataDir="data",
+        cachedChunks="cache/cached_chunks.json",
+        cachedEmbeddings="cache/cached_embeddings.npy",
     ):
         self.ragPipeline = None
+        self._cachedChunks = cachedChunks
+        self._cachedEmbeddings = cachedEmbeddings
         self.cacheManager = CacheManager(cacheDir, dataDir)
         self._embedder = embedder
         self._chatClient = chatClient
@@ -32,9 +36,9 @@ class DocumentRAGSystem:
     def initialize(self):
         """Initialize RAGPipeline once at startup"""
         fileChanges = self.cacheManager.get_file_changes()
-        cacheFile = f"{self.cacheManager.cacheDir}/embeddings.json"
-
-        cacheExists = os.path.exists(cacheFile) and os.path.getsize(cacheFile) > 0
+        cachedChunks = f"{self.cacheManager.cacheDir}/cached_chunks.json"
+        cachedEmbeddings = f"{self.cacheManager.cacheDir}/cached_embeddings.npy"
+        cacheExists = os.path.exists(cachedChunks) and os.path.exists(cachedEmbeddings)
 
         if (
             cacheExists
@@ -45,7 +49,8 @@ class DocumentRAGSystem:
             print("Using cached embeddings")
             self.ragPipeline = RAGPipeline.from_cache(
                 config=self.config,
-                cacheFile=f"{self.cacheManager.cacheDir}/embeddings.json",
+                cachedChunks=cachedChunks,
+                cachedEmbeddings=cachedEmbeddings,
                 embedder=self._embedder,
                 chatClient=self._chatClient,
             )
@@ -83,7 +88,8 @@ class DocumentRAGSystem:
                 embedder=self._embedder,
                 config=self.config,
                 chatClient=self._chatClient,
-                cacheFile=f"{self.cacheManager.cacheDir}/embeddings.json",
+                cachedChunks=self._cachedChunks,
+                cachedEmbeddings=self._cachedEmbeddings,
             )
         except Exception as e:
             print(f"Error processing files: {e}")
@@ -127,5 +133,6 @@ class DocumentRAGSystem:
             config=self.config,
             embedder=self._embedder,
             chatClient=self._chatClient,
-            cacheFile=f"{self.cacheManager.cacheDir}/embeddings.json",
+            cachedChunks=self._cachedChunks,
+            cachedEmbeddings=self._cachedEmbeddings,
         )

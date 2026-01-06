@@ -1,6 +1,5 @@
 from .embeddings import EmbeddingService
 from .vectordb import VectorDB
-import openai
 import json
 import numpy as np
 from config import Config
@@ -8,35 +7,47 @@ from .reranker import RerankerService
 from .bm25 import BM25Index
 from .llm_chat_client import LLMChat
 
+
 class RAGPipeline:
-    def __init__(self, chunks, config: Config, embedder=None, chatClient=None, cacheFile="cache/embeddings.json"):
+    def __init__(
+        self,
+        chunks,
+        config: Config,
+        embedder=None,
+        chatClient=None,
+        cachedChunks="cache/cached_chunks.json",
+        cachedEmbeddings="cache/cached_embeddings.npy",
+    ):
         self.config = config
         self.db = VectorDB(dim=config.vectorDB.dim)
         self.texts = [chunk["text"] for chunk in chunks]
         self.chunks = chunks
-        
+
         # Initialize services
-        self.embeddingService = EmbeddingService(config) if embedder is None else embedder
+        self.embeddingService = (
+            EmbeddingService(config) if embedder is None else embedder
+        )
         self.rerankerService = RerankerService(config)
         self.bm25Index = BM25Index(self.texts, config)
-        
+
         self._chatClient = LLMChat(config) if chatClient is None else chatClient
-        self._cacheFile = cacheFile
-        
+        self._cachedChunks = cachedChunks
+        self._cachedEmbeddings = cachedEmbeddings
+
         if not self.texts or not self.chunks:
             self.embeddings = []
             self.chunks = []
         else:
             # Use service methods
-            if hasattr(self.embeddingService, 'get_embedding_batch'):
+            if hasattr(self.embeddingService, "get_embedding_batch"):
                 self.embeddings = self.embeddingService.get_embedding_batch(self.texts)
             else:
                 # Fallback for custom embedder
                 self.embeddings = self.embeddingService(self.texts)
-            
+
             metadataList = [chunk["metadata"] for chunk in self.chunks]
             self.db.add(self.embeddings, self.texts, metadataList)
-        
+
         self.add_to_cache()
         self.conversationHistory = []
 
@@ -44,49 +55,41 @@ class RAGPipeline:
     def from_cache(
         cls,
         config: Config,
-        cacheFile="cache/embeddings.json",
+        cachedChunks="cache/cached_chunks.json",
+        cachedEmbeddings="cache/cached_embeddings.npy",
         embedder=None,
         chatClient=None,
     ):
-        with open(cacheFile, "r") as f:
+        with open(cachedChunks, "r") as f:
             metadata = json.load(f)
+        with open(cachedEmbeddings, "rb") as f:
+            embeddings = np.load(f)
 
         obj = cls.__new__(cls)
         obj.db = VectorDB(dim=config.vectorDB.dim)
-        obj.chunks = metadata["chunks"]
-        obj.embeddings = metadata["embeddings"]
+        obj.chunks = metadata
+        obj.embeddings = embeddings
         obj.texts = [chunk["text"] for chunk in obj.chunks]
         obj.config = config
-        
-        # Initialize services
-        obj.embeddingService = EmbeddingService(config) if embedder is None else embedder
+
+        obj.embeddingService = (
+            EmbeddingService(config) if embedder is None else embedder
+        )
         obj.rerankerService = RerankerService(config)
-        obj.bm25Index = BM25Index(obj.texts, config)  # Fixed: added config parameter
-        
+        obj.bm25Index = BM25Index(obj.texts, config)
         obj._chatClient = LLMChat(config) if chatClient is None else chatClient
-        obj._cacheFile = cacheFile
 
         # Initialize conversation history
         obj.conversationHistory = []
-
-        metadataList = [chunk["metadata"] for chunk in obj.chunks]
-        obj.db.add(obj.embeddings, obj.texts, metadataList)
         return obj
 
     def ask(self, query):
         if not self.chunks or not self.embeddings:
             raise ValueError("Cannot query: No documents loaded.")
 
-        # Use service method - no config parameter needed
-        if hasattr(self.embeddingService, 'get_embedding_single'):
-            queryEmb = self.embeddingService.get_embedding_single(query)
-        else:
-            # Fallback for custom embedder
-            queryEmb = self.embeddingService(query)
+        queryEmb = self.embeddingService.get_embedding_single(query)
 
-        # 1. BM25 search - no config parameter needed
         bm25Results = self.bm25Index.search(query)
-        # Convert BM25 results to same format as vector results
         bm25Candidates = []
         for idx, score, text in bm25Results:
             bm25Candidates.append(
@@ -146,7 +149,6 @@ class RAGPipeline:
         messages = self.build_conversation_context(context)
         messages.append({"role": "user", "content": query})
 
-        
         responseText = self._chatClient.chat(messages)
         self.add_to_conversation_history(query, responseText)
         # Add source information for custom chat client
@@ -190,19 +192,9 @@ class RAGPipeline:
 
     def add_to_cache(self):
         """Ensure embeddings are JSON serializable (convert numpy arrays to lists)"""
-        serializableEmbeddings = []
-        for emb in self.embeddings:
-            if isinstance(emb, np.ndarray):
-                serializableEmbeddings.append(emb.tolist())
-            else:
-                try:
-                    serializableEmbeddings.append(np.asarray(emb).tolist())
-                except Exception:
-                    serializableEmbeddings.append(emb)
+        if self.embeddings:
+            embeddingsArray = np.array(self.embeddings, dtype=np.float32)
+            np.save(self._cachedEmbeddings, embeddingsArray)
 
-        cacheData = {
-            "chunks": self.chunks,
-            "embeddings": serializableEmbeddings,
-        }
-        with open(self._cacheFile, "w") as f:
-            json.dump(cacheData, f, indent=2)
+        with open(self._cachedChunks, "w") as f:
+            json.dump(self.chunks, f, indent=2)

@@ -4,12 +4,17 @@ import os
 import ollama
 from config import Config
 
+
 class EmbeddingService:
     def __init__(self, config: Config):
         self.config = config
         self.provider = config.embedding.provider
         self.model = config.embedding.model
-        self.client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY")) if config.embedding.provider == "openai" else None
+        self.client = (
+            openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+            if config.embedding.provider == "openai"
+            else None
+        )
 
     def get_embedding_single(self, text):
         if self.provider == "openai":

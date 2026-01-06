@@ -1,6 +1,7 @@
 from sentence_transformers import CrossEncoder
 from config import Config
 
+
 class RerankerService:
     def __init__(self, config: Config):
         self.config = config
