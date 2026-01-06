@@ -37,8 +37,9 @@ STOPWORDS = {
 # BM25 index for keyword-based text retrieval. Complements semantic search
 # (embeddings) by providing exact keyword matching capabilities.
 class BM25Index:
-    def __init__(self, texts):
+    def __init__(self, texts, config: Config):
         self.texts = texts
+        self.config = config  # Store config
         self.tokenizedTexts = self._tokenize(texts)
         self.bm25 = BM25Okapi(self.tokenizedTexts)
 
@@ -56,13 +57,14 @@ class BM25Index:
         return tokenized
 
     # Search for top k results using BM25
-    def search(self, query: str, config: Config):
-        minHeap = []
-        heapq.heapify(minHeap)
-        scores = self.bm25.get_scores(query)
+    def search(self, query: str):
+        maxHeap = []
+        heapq.heapify(maxHeap)
+        tokenizedQuery = self._tokenize([query])[0]
+        scores = self.bm25.get_scores(tokenizedQuery)
         for i, score in enumerate(scores):
-            if len(minHeap) < config.retrieval.bm25TopK:
-                heapq.heappush(minHeap, (score, i))
+            if len(maxHeap) < self.config.retrieval.bm25TopK:
+                heapq.heappush(maxHeap, (-score, i))
             else:
-                heapq.heappushpop(minHeap, (score, i))
-        return [(i, float(score), self.texts[i]) for score, i in minHeap]
+                heapq.heappushpop(maxHeap, (-score, i))
+        return [(i, float(-score), self.texts[i]) for score, i in maxHeap]

@@ -1,6 +1,5 @@
 import hashlib
 
-
 # Compute MD5 hash of a file. Used to detect if PDFs have been modified
 # and need re-embedding.
 def get_file_hash(path):

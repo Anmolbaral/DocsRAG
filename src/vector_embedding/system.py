@@ -5,6 +5,7 @@ from pathlib import Path
 from config import Config
 from typing import Union, Tuple
 import time
+import os
 
 
 class DocumentRAGSystem:
@@ -31,8 +32,13 @@ class DocumentRAGSystem:
     def initialize(self):
         """Initialize RAGPipeline once at startup"""
         fileChanges = self.cacheManager.get_file_changes()
+        cacheFile = f"{self.cacheManager.cacheDir}/embeddings.json"
+
+        cacheExists = os.path.exists(cacheFile) and os.path.getsize(cacheFile) > 0
+
         if (
-            not fileChanges["changedFiles"]
+            cacheExists
+            and not fileChanges["changedFiles"]
             and not fileChanges["newFiles"]
             and not fileChanges["removedFiles"]
         ):
@@ -90,8 +96,6 @@ class DocumentRAGSystem:
 
         if not self.ragPipeline:
             raise ValueError("System not initialized. Call initialize() first.")
-        if not query or not query.strip():
-            raise ValueError("Query cannot be empty")
 
         startTime = time.time()
         answer = self.ragPipeline.ask(query.strip())

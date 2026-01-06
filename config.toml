@@ -1,16 +1,26 @@
+# [llm]
+# provider = "ollama"
+# model = "llama3.1:8b"
+
+# [embedding]
+# provider = "ollama"
+# model = "nomic-embed-text"
+
+[llm]
+provider = "openai" 
+model = "gpt-4o-mini"
+
 [embedding]
+provider = "openai" 
 model = "text-embedding-3-small"
 
 [vectorDB]
 dim = 1536
 
-[generation]
-model = "gpt-4o-mini"
-
 [chunking]
-chunkSize = 500
-overlap = 100
-minChunkChars = 200
+chunkSize = 300
+overlap = 60
+minChunkChars = 150
 
 [retrieval]
 vectorTopK = 20

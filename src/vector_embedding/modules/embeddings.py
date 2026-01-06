@@ -1,21 +1,29 @@
+# In modules/embeddings.py
 import openai
 import os
+import ollama
 from config import Config
 
-client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+class EmbeddingService:
+    def __init__(self, config: Config):
+        self.config = config
+        self.provider = config.embedding.provider
+        self.model = config.embedding.model
+        self.client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY")) if config.embedding.provider == "openai" else None
 
+    def get_embedding_single(self, text):
+        if self.provider == "openai":
+            response = self.client.embeddings.create(input=text, model=self.model)
+            return response.data[0].embedding
+        elif self.provider == "ollama":
+            response = ollama.embeddings(model=self.model, prompt=text)
+            return response.get("embedding", response)
+        raise ValueError(f"Invalid provider: {self.provider}")
 
-# Get embedding for a single text. Use get_embedding_batch() for multiple texts.
-# Returns a 3072-dimensional vector for text-embedding-3-large model.
-def get_embedding_single(text, config: Config):
-    model = config.embedding.model
-    response = client.embeddings.create(input=text, model=model)
-    return response.data[0].embedding
-
-
-# Get embeddings for multiple texts in a single API call. More efficient than
-def get_embedding_batch(texts, config: Config):
-    model = config.embedding.model
-    cleanTexts = [str(text).strip() for text in texts]
-    response = client.embeddings.create(input=cleanTexts, model=model)
-    return [item.embedding for item in response.data]
+    def get_embedding_batch(self, texts):
+        if self.provider == "openai":
+            resp = self.client.embeddings.create(input=texts, model=self.model)
+            return [item.embedding for item in resp.data]
+        elif self.provider == "ollama":
+            return [self.get_embedding_single(text) for text in texts]
+        raise ValueError(f"Invalid provider: {self.provider}")

@@ -7,7 +7,7 @@ from config import Config
 
 # Load and chunk a PDF into overlapping text chunks
 # Returns list of dicts with "text" and "metadata" (page, filename, category).
-def load_pdf(path, config):
+def load_pdf(path, config: Config):
     # Extract config values at the start to avoid repetition
     chunkSize = config.chunking.chunkSize
     overlap = config.chunking.overlap
@@ -21,7 +21,6 @@ def load_pdf(path, config):
 
         doc = fitz.open(path)
         allChunks = []
-        allTexts = []
 
         for pageNum in range(len(doc)):
             page = doc[pageNum]
@@ -30,8 +29,6 @@ def load_pdf(path, config):
             if not text:
                 continue
 
-            text = clean_text(text)
-            allTexts.append(text)
             chunkTexts = create_overlap_chunks(
                 text, chunkSize=chunkSize, overlap=overlap
             )
@@ -66,7 +63,7 @@ def load_pdf(path, config):
 # the text coming from the PDF before chunking them
 def clean_text(text: str) -> str:
     # Remove zero-width characters (common in PDFs)
-    text = re.sub(r"[\u2013\u2019\u200B\u200C\u200D\uFEFF]", "", text)
+    text = re.sub(r"[\u2013\u2019\u200B\u200C\u200D\uFEFF\u25cf\u200b\u200c\u200d\n\t\r]", "", text)
 
     # Normalize unicode (fix weird characters)
     text = unicodedata.normalize("NFKC", text)

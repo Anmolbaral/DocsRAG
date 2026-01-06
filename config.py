@@ -2,28 +2,25 @@ import tomllib
 from pathlib import Path
 from dataclasses import dataclass
 
+@dataclass
+class LLMConfig:
+    provider: str
+    model: str
 
 @dataclass
 class EmbeddingConfig:
+    provider: str
     model: str
-
 
 @dataclass
 class VectorDBConfig:
     dim: int
-
-
-@dataclass
-class GenerationConfig:
-    model: str
-
 
 @dataclass
 class ChunkingConfig:
     chunkSize: int
     overlap: int
     minChunkChars: int
-
 
 @dataclass
 class RetrievalConfig:
@@ -47,9 +44,9 @@ class ConversationConfig:
 
 @dataclass
 class Config:
+    llm: LLMConfig
     embedding: EmbeddingConfig
     vectorDB: VectorDBConfig
-    generation: GenerationConfig
     chunking: ChunkingConfig
     retrieval: RetrievalConfig
     reranker: RerankerConfig
@@ -68,9 +65,9 @@ class Config:
             raise ValueError(f"Failed to load config from {configPath}: {e}")
 
         return cls(
+            llm=LLMConfig(**config["llm"]), 
             embedding=EmbeddingConfig(**config["embedding"]),
             vectorDB=VectorDBConfig(**config["vectorDB"]),
-            generation=GenerationConfig(**config["generation"]),
             chunking=ChunkingConfig(**config["chunking"]),
             retrieval=RetrievalConfig(**config["retrieval"]),
             reranker=RerankerConfig(**config["reranker"]),

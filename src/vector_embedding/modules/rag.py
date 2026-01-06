@@ -1,54 +1,44 @@
-from .embeddings import get_embedding_single, get_embedding_batch
+from .embeddings import EmbeddingService
 from .vectordb import VectorDB
-from .reranker import initialize_reranker, rerank_candidates
 import openai
 import json
 import numpy as np
-from .bm25 import BM25Index
 from config import Config
-
+from .reranker import RerankerService
+from .bm25 import BM25Index
+from .llm_chat_client import LLMChat
 
 class RAGPipeline:
-    def __init__(
-        self,
-        chunks,
-        config: Config,
-        embedder=None,
-        chatClient=None,
-        cacheFile="cache/embeddings.json",
-    ):
+    def __init__(self, chunks, config: Config, embedder=None, chatClient=None, cacheFile="cache/embeddings.json"):
         self.config = config
         self.db = VectorDB(dim=config.vectorDB.dim)
         self.texts = [chunk["text"] for chunk in chunks]
         self.chunks = chunks
-        self.bm25Index = BM25Index(self.texts)
-        self._embedderSingle = (
-            getattr(embedder, "get_embedding_single", None)
-            if embedder
-            else get_embedding_single
-        )
-        self._embedderBatch = (
-            getattr(embedder, "get_embedding_batch", None)
-            if embedder
-            else get_embedding_batch
-        )
-        self._chatClient = chatClient
+        
+        # Initialize services
+        self.embeddingService = EmbeddingService(config) if embedder is None else embedder
+        self.rerankerService = RerankerService(config)
+        self.bm25Index = BM25Index(self.texts, config)
+        
+        self._chatClient = LLMChat(config) if chatClient is None else chatClient
         self._cacheFile = cacheFile
-        # If no texts are provided, return early
+        
         if not self.texts or not self.chunks:
             self.embeddings = []
             self.chunks = []
         else:
-            self.embeddings = self._embedderBatch(self.texts, self.config)
+            # Use service methods
+            if hasattr(self.embeddingService, 'get_embedding_batch'):
+                self.embeddings = self.embeddingService.get_embedding_batch(self.texts)
+            else:
+                # Fallback for custom embedder
+                self.embeddings = self.embeddingService(self.texts)
+            
             metadataList = [chunk["metadata"] for chunk in self.chunks]
             self.db.add(self.embeddings, self.texts, metadataList)
+        
         self.add_to_cache()
-
-        # Adding conversation memory
         self.conversationHistory = []
-
-        # Initialize reranker
-        self.reranker = initialize_reranker(self.config)
 
     @classmethod
     def from_cache(
@@ -66,26 +56,18 @@ class RAGPipeline:
         obj.chunks = metadata["chunks"]
         obj.embeddings = metadata["embeddings"]
         obj.texts = [chunk["text"] for chunk in obj.chunks]
-        obj.bm25Index = BM25Index(obj.texts)
-        obj._embedderSingle = (
-            getattr(embedder, "get_embedding_single", None)
-            if embedder
-            else get_embedding_single
-        )
-        obj._embedderBatch = (
-            getattr(embedder, "get_embedding_batch", None)
-            if embedder
-            else get_embedding_batch
-        )
-        obj._chatClient = chatClient
-        obj._cacheFile = cacheFile
         obj.config = config
+        
+        # Initialize services
+        obj.embeddingService = EmbeddingService(config) if embedder is None else embedder
+        obj.rerankerService = RerankerService(config)
+        obj.bm25Index = BM25Index(obj.texts, config)  # Fixed: added config parameter
+        
+        obj._chatClient = LLMChat(config) if chatClient is None else chatClient
+        obj._cacheFile = cacheFile
 
-        # Intializing conversation history
+        # Initialize conversation history
         obj.conversationHistory = []
-
-        # Initialize reranker
-        obj.reranker = initialize_reranker(config)
 
         metadataList = [chunk["metadata"] for chunk in obj.chunks]
         obj.db.add(obj.embeddings, obj.texts, metadataList)
@@ -95,10 +77,15 @@ class RAGPipeline:
         if not self.chunks or not self.embeddings:
             raise ValueError("Cannot query: No documents loaded.")
 
-        queryEmb = self._embedderSingle(query, self.config)
+        # Use service method - no config parameter needed
+        if hasattr(self.embeddingService, 'get_embedding_single'):
+            queryEmb = self.embeddingService.get_embedding_single(query)
+        else:
+            # Fallback for custom embedder
+            queryEmb = self.embeddingService(query)
 
-        # 1. BM25 search
-        bm25Results = self.bm25Index.search(query, self.config)
+        # 1. BM25 search - no config parameter needed
+        bm25Results = self.bm25Index.search(query)
         # Convert BM25 results to same format as vector results
         bm25Candidates = []
         for idx, score, text in bm25Results:
@@ -145,8 +132,8 @@ class RAGPipeline:
                             "distance"
                         ]
 
-        # 4. Rerank top 10
-        results = rerank_candidates(query, mergedCandidates, self.reranker, self.config)
+        # 4. Rerank using service
+        results = self.rerankerService.rerank_candidates(query, mergedCandidates)
 
         contextParts = []
 
@@ -159,22 +146,20 @@ class RAGPipeline:
         messages = self.build_conversation_context(context)
         messages.append({"role": "user", "content": query})
 
-        if self._chatClient is not None:
-            responseText = self._chatClient(messages)
-            self.add_to_conversation_history(query, responseText)
-            # Add source information for custom chat client
-            sources = [
-                f"{result['metadata']['category']}/{result['metadata']['filename']}"
-                for result in results[:3]
-            ]
-            queryAnswer = responseText + f"\n\n-----Sources: {', '.join(sources)}"
-            return queryAnswer
+        
+        responseText = self._chatClient.chat(messages)
+        self.add_to_conversation_history(query, responseText)
+        # Add source information for custom chat client
+        sources = [
+            f"{result['metadata']['category']}/{result['metadata']['filename']}"
+            for result in results[:3]
+        ]
+        queryAnswer = responseText + f"\n\n-----Sources: {', '.join(sources)}"
+        return queryAnswer
 
-        response = openai.chat.completions.create(
-            model=self.config.generation.model, messages=messages
-        )
-        self.add_to_conversation_history(query, response.choices[0].message.content)
-        return response.choices[0].message.content
+        responseText = self._chatClient.chat(messages)
+        self.add_to_conversation_history(query, responseText)
+        return responseText
 
     def build_conversation_context(self, documentContext):
         conversationContext = []
@@ -221,6 +206,3 @@ class RAGPipeline:
         }
         with open(self._cacheFile, "w") as f:
             json.dump(cacheData, f, indent=2)
-
-    def search_bm25(self, query: str):
-        return self.bm25Index.search(query, self.config)

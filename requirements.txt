@@ -13,3 +13,4 @@ sentence-transformers
 ruff
 black
 rank-bm25
+ollama
