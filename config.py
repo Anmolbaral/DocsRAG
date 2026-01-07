@@ -6,6 +6,7 @@ from dataclasses import dataclass
 @dataclass
 class LLMConfig:
     provider: str
+    parseModel: str
     model: str
 
 
@@ -59,9 +60,12 @@ class Config:
 
     @classmethod
     def from_file(cls, configPath: Path) -> "Config":
-        if not configPath.exists():
+        if configPath is None:
+            # Auto-find config.toml in project root
             projectRoot = Path(__file__).parent
             configPath = projectRoot / "config.toml"
+        elif isinstance(configPath, str):
+            configPath = Path(configPath)
 
         try:
             with open(configPath, "rb") as f:

@@ -3,62 +3,111 @@ import re
 import os
 import unicodedata
 from config import Config
+from typing import List, Dict, Any
 
 
-# Load and chunk a PDF into overlapping text chunks
-# Returns list of dicts with "text" and "metadata" (page, filename, category).
-def load_pdf(path, config: Config):
-    # Extract config values at the start to avoid repetition
-    chunkSize = config.chunking.chunkSize
-    overlap = config.chunking.overlap
-    minChunkChars = config.chunking.minChunkChars
-
+# Load PDF and extract text per page (no chunking)
+# Returns list of dicts with "text" (full page text) and "metadata" (page, filename, category).
+def load_pdf(path: str) -> List[Dict[str, Any]]:
     try:
         if os.path.getsize(path) == 0:
             return []
 
         category = path.split("/")[-2]
+        filename = path.split("/")[-1]
 
         doc = fitz.open(path)
-        allChunks = []
+        pages = []
 
         for pageNum in range(len(doc)):
             page = doc[pageNum]
             text = page.get_text("text") or ""
             text = text.strip()
+            
             if not text:
                 continue
 
+            # Clean the text
             text = clean_text(text)
 
-            chunkTexts = create_overlap_chunks(
-                text, chunkSize=chunkSize, overlap=overlap
+            pages.append(
+                {
+                    "text": text,
+                    "metadata": {
+                        "page": pageNum + 1,
+                        "path": path,
+                        "category": category,
+                        "filename": filename,
+                    },
+                }
             )
-
-            for chunkIndex, chunkText in enumerate(chunkTexts):
-                chunkText = chunkText.strip()
-
-                # drop junk/tiny chunks
-                if len(chunkText) < minChunkChars:
-                    continue
-
-                allChunks.append(
-                    {
-                        "text": chunkText,
-                        "metadata": {
-                            "page": pageNum + 1,
-                            "path": path,
-                            "category": category,
-                            "filename": path.split("/")[-1],
-                            "chunkId": chunkIndex,
-                        },
-                    }
-                )
-        return allChunks
+        
+        doc.close()
+        return pages
 
     except Exception as e:
         print(f"Error loading file {path}: {e}")
         return []
+
+
+# Chunk text into overlapping chunks
+# Returns list of dicts with "text" (chunk text) and "metadata" (includes chunkId).
+def chunk_text(
+    pages: List[Dict[str, Any]], 
+    config: Config,
+    chunkSize: int = None,
+    overlap: int = None,
+    minChunkChars: int = None
+) -> List[Dict[str, Any]]:
+    # Use config defaults if not provided
+    if chunkSize is None:
+        chunkSize = config.chunking.chunkSize
+    if overlap is None:
+        overlap = config.chunking.overlap
+    if minChunkChars is None:
+        minChunkChars = config.chunking.minChunkChars
+    
+    allChunks = []
+
+    for page in pages:
+        pageText = page["text"]
+        pageMetadata = page["metadata"]
+
+        chunkTexts = create_overlap_chunks(
+            pageText, chunkSize, overlap
+        )
+
+        for chunkIndex, chunkText in enumerate(chunkTexts):
+            chunkText = chunkText.strip()
+
+            # Drop junk/tiny chunks
+            if len(chunkText) < minChunkChars:
+                continue
+
+            # Create metadata for this chunk
+            chunkMetadata = pageMetadata.copy()
+            chunkMetadata["chunkId"] = chunkIndex
+
+            allChunks.append(
+                {
+                    "text": chunkText,
+                    "metadata": chunkMetadata,
+                }
+            )
+    
+    return allChunks
+
+
+# Convenience function: Load PDF and chunk it (backward compatibility)
+def load_and_chunk_pdf(
+    path: str, 
+    config: Config,
+    chunkSize: int = None,
+    overlap: int = None,
+    minChunkChars: int = None
+) -> List[Dict[str, Any]]:
+    pages = load_pdf(path)
+    return chunk_text(pages, config, chunkSize, overlap, minChunkChars)
 
 
 # Clean text to remove common PDF formatting issues and normalize
@@ -100,14 +149,12 @@ def clean_text(text: str) -> str:
 
 
 # Create overlapping chunks from raw text. Chunks by words with overlap.
-# chunkSize and overlap are in words. Overlap preserves context across
-# chunk boundaries (useful for RAG systems).
-def create_overlap_chunks(text, chunkSize=500, overlap=100):
+def create_overlap_chunks(text: str, chunkSize: int, overlap: int) -> List[str]:
     # Split text into words
     words = text.split()
 
     if len(words) <= chunkSize:
-        return [text]  # Returning whole text if it's smaller than chunk size
+        return [text]
 
     chunks = []
     start = 0

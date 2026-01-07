@@ -1,6 +1,6 @@
 [project]
-name = "vector-embedding"
-version = "0.1.0"
+name = "DocuRAG"
+version = "0.2.0"
 description = "Personal Document RAG System"
 readme = "README.md"
 requires-python = ">=3.9"
@@ -16,6 +16,13 @@ dependencies = [
   "langsmith",
   "langchain",
   "langchain-openai",
+  "scikit-learn",
+  "sentence-transformers",
+  "ruff",
+  "black",
+  "rank-bm25",
+  "ollama",
+  "pydantic",
 ]
 
 [build-system]

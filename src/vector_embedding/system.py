@@ -1,5 +1,5 @@
 from .modules.rag import RAGPipeline
-from .modules.loader import load_pdf
+from .modules.loader import load_and_chunk_pdf
 from .modules.cache_manager import CacheManager
 from pathlib import Path
 from config import Config
@@ -75,7 +75,7 @@ class DocumentRAGSystem:
         try:
             for datafile in self.cacheManager.dataDir.rglob("*.pdf"):
                 datafile = str(datafile)
-                docs = load_pdf(datafile, config=self.config)
+                docs = load_and_chunk_pdf(datafile, config=self.config)
                 fileMetadata[datafile] = self.cacheManager.get_file_metadata_for_path(
                     datafile
                 )
@@ -120,7 +120,7 @@ class DocumentRAGSystem:
         for datafile in self.cacheManager.dataDir.rglob("*.pdf"):
             datafile = str(datafile)
             if datafile in filesToUpdate:
-                docs = load_pdf(datafile, config=self.config)
+                docs = load_and_chunk_pdf(datafile, config=self.config)
                 newChunks.extend(docs)
 
         # Combine: kept chunks (unchanged files) + new chunks (changed/new files)

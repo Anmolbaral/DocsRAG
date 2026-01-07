@@ -14,3 +14,4 @@ ruff
 black
 rank-bm25
 ollama
+pydantic
