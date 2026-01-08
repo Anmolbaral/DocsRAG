@@ -1,11 +1,11 @@
-from .embeddings import EmbeddingService
-from .vectordb import VectorDB
+from ..core.retrieval.embeddings import EmbeddingService
+from ..core.retrieval.vectordb import VectorDB
 import json
 import numpy as np
-from config import Config
-from .reranker import RerankerService
-from .bm25 import BM25Index
-from .llm_chat_client import LLMChat
+from ..core.config.config import Config
+from ..core.retrieval.reranker import RerankerService
+from ..core.retrieval.bm25 import BM25Index
+from ..core.llm.client import LLMChat
 
 
 class RAGPipeline:

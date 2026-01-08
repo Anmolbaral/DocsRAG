@@ -2,7 +2,7 @@ from .pipeline.rag import RAGPipeline
 from .core.documents.loader import load_and_chunk_pdf
 from .core.cache import CacheManager
 from pathlib import Path
-from .core.configs import Config
+from .core.config import Config
 from typing import Union, Tuple
 import time
 import os

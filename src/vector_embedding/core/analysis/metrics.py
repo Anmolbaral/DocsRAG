@@ -1,12 +1,12 @@
-from src.vector_embedding.modules.semantic_profile.extractor import MetadataExtractor
-from src.vector_embedding.modules.semantic_profile.insights import InsightEngine
+from .semantic_profile.extractor import MetadataExtractor
+from .semantic_profile.insights import InsightEngine
 from openai import OpenAI
 import os
 import json
 import logging
-from config import Config
+from ..config.config import Config
 from pathlib import Path
-from src.vector_embedding.core.llm.client import LLMChat
+from ..llm.client import LLMChat
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')

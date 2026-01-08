@@ -2,7 +2,7 @@ import fitz
 import re
 import os
 import unicodedata
-from config import Config
+from ..config.config import Config
 from typing import List, Dict, Any
 
 

@@ -1,4 +1,4 @@
-from configs.config import Config
+from ..config.config import Config
 import openai
 import ollama
 import os

@@ -4,8 +4,8 @@ import logging
 from typing import List, Dict, Any, Literal, Optional
 from pydantic import BaseModel, Field
 from openai import OpenAI
-from documents.loader import load_pdf
-from configs.config import Config
+from ...documents.loader import load_pdf
+from ...config.config import Config
 from pathlib import Path
 
 # Configure logging

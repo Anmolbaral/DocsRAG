@@ -2,7 +2,7 @@
 import openai
 import os
 import ollama
-from config import Config
+from ..config.config import Config
 
 
 class EmbeddingService:
