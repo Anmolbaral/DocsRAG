@@ -1,8 +1,8 @@
-from .modules.rag import RAGPipeline
-from .modules.loader import load_and_chunk_pdf
-from .modules.cache_manager import CacheManager
+from .pipeline.rag import RAGPipeline
+from .core.documents.loader import load_and_chunk_pdf
+from .core.cache import CacheManager
 from pathlib import Path
-from config import Config
+from .core.configs import Config
 from typing import Union, Tuple
 import time
 import os

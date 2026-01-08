@@ -6,7 +6,7 @@ import json
 import logging
 from config import Config
 from pathlib import Path
-from src.vector_embedding.modules.llm_chat_client import LLMChat
+from src.vector_embedding.core.llm.client import LLMChat
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')

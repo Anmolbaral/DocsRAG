@@ -1,0 +1,898 @@
+# VaultIQ - Personal Document Intelligence System
+# AI Assistant Rules & Guidelines
+
+## 🎯 Project Identity
+
+**Name**: VaultIQ (formerly DocuRAG) - Personal Document Intelligence System
+**Author**: Anmol Baruwal
+**Version**: 0.2.0
+**Python**: >=3.9
+
+### What This System Does
+1. **RAG (Retrieval-Augmented Generation)**: Q&A over personal documents using hybrid search
+2. **Semantic Profiling**: Extract structured metadata (skills, tone, company profiles, claims)
+3. **Career Intelligence**: Analyze resumes, cover letters, research papers for gaps and insights
+4. **Multi-Provider Support**: Works with both OpenAI and Ollama (local) models
+
+### Core Technologies
+- **Vector Search**: FAISS (IndexHNSWFlat) for approximate nearest neighbor
+- **Keyword Search**: BM25 (rank-bm25) for exact term matching
+- **Reranking**: Cross-encoder (sentence-transformers) for result refinement
+- **LLMs**: OpenAI GPT models or Ollama local models
+- **Document Processing**: PyMuPDF (fitz) for PDF extraction
+
+---
+
+## 📐 Naming Conventions (STRICTLY ENFORCE)
+
+### Python Code (CRITICAL - These are ACTUAL conventions used)
+```python
+# Functions: snake_case
+def load_pdf():
+def get_embedding_single():
+def load_and_chunk_pdf():
+
+# Variables: camelCase
+queryEmb = ...
+allChunks = []
+fileMetadata = {}
+contextParts = []
+conversationHistory = []
+
+# Classes: PascalCase
+class RAGPipeline:
+class DocumentRAGSystem:
+class CacheManager:
+
+# Constants: UPPER_SNAKE_CASE
+RAG_SYSTEM_PROMPT = "..."
+MAX_BATCH_SIZE = 100
+DEFAULT_CHUNK_SIZE = 300
+
+# Service Classes: PascalCase + "Service" suffix
+class EmbeddingService:
+class RerankerService:
+# (Note: Not all services have suffix - LLMChat, CacheManager don't)
+
+# Private/Internal: Leading underscore
+self._cachedChunks = ...
+self._embedder = ...
+def _internal_method():
+```
+
+### Files & Directories
+```
+# Python modules: snake_case.py
+embeddings.py
+cache_manager.py  # NOT cacheManager.py
+llm_chat_client.py
+
+# Packages/folders: snake_case/
+semantic_profile/
+vector_embedding/
+
+# Config files: Various (follow conventions)
+config.toml  # TOML format
+pyproject.toml
+requirements.txt
+.cursorrules
+```
+
+---
+
+## Project Architecture
+
+### Directory Structure & Responsibilities
+
+```
+Vector Embedding/  (⚠️ TODO: Rename to remove spaces → vector-embedding/)
+├── .cursorrules          ← AI assistant rules (this file)
+├── .env                  ← API keys (NEVER commit)
+├── .gitignore            
+├── config.toml           ← ALL system configuration (edit this, not code!)
+├── pyproject.toml        ← Package metadata, dependencies
+├── requirements.txt      ← Pip dependencies
+├── README.md             ← User documentation
+│
+├── cache/                ← 📦 GENERATED DATA FILES (not code!)
+│   ├── cached_chunks.json       # Document chunks
+│   ├── cached_embeddings.npy    # Vector embeddings
+│   ├── file_metadata.json       # File change tracking
+│   ├── llm_view.json            # Extracted metadata
+│   └── document_metadata.json   # Document analysis
+│
+├── data/                 ← 📄 INPUT DOCUMENTS (PDFs)
+│   ├── resume/
+│   ├── cover_letters/
+│   └── misc_docs/
+│
+└── src/vector_embedding/ ← 💻 SOURCE CODE
+    ├── __init__.py       # Lazy loads DocumentRAGSystem
+    ├── system.py         # 🎬 MAIN ENTRY POINT - orchestrates everything
+    │
+    ├── cli/              # Command-line interface
+    │   ├── __init__.py
+    │   └── chat.py       # Interactive chat UI
+    │
+    ├── pipeline/         # Orchestration layer
+    │   ├── __init__.py
+    │   └── rag.py        # 🔄 CORE ORCHESTRATOR - coordinates retrieval & generation
+    │
+    └── core/             # Core business logic (organized by domain)
+        │
+        ├── retrieval/    # Search & retrieval components
+        │   ├── __init__.py
+        │   ├── embeddings.py   # EmbeddingService - generate embeddings
+        │   ├── vectordb.py     # VectorDB - FAISS vector storage/search
+        │   ├── bm25.py         # BM25Index - keyword search
+        │   └── reranker.py     # RerankerService - cross-encoder reranking
+        │
+        ├── documents/    # Document processing
+        │   ├── __init__.py
+        │   └── loader.py       # load_pdf(), load_and_chunk_pdf()
+        │
+        ├── llm/          # LLM interactions
+        │   ├── __init__.py
+        │   ├── client.py       # LLMChat - API wrapper (OpenAI/Ollama)
+        │   └── prompts.py      # ⚠️ TODO: Centralized prompt templates
+        │
+        ├── cache/        # 🔧 CACHE MANAGEMENT CODE (not data!)
+        │   ├── __init__.py
+        │   ├── manager.py      # CacheManager - cache logic
+        │   └── hashing.py      # File hash computation (MD5)
+        │
+        ├── config/       # Configuration management
+        │   ├── __init__.py
+        │   └── config.py       # Config dataclasses, TOML loader
+        │
+        └── analysis/     # Document analysis & profiling
+            ├── __init__.py
+            ├── metrics.py      # Analysis orchestration
+            └── semantic_profile/
+                ├── __init__.py
+                ├── extractor.py    # MetadataExtractor - structured extraction
+                └── insights.py     # InsightEngine - gap analysis
+```
+
+### ⚠️ CRITICAL: Two "cache" Locations Explained
+
+**This is CORRECT and intentional - DO NOT confuse them!**
+
+1. **`/cache/`** (root directory)
+   - **Purpose**: Store GENERATED DATA files
+   - **Contains**: `.json`, `.npy` files (embeddings, metadata, chunks)
+   - **Type**: Data storage
+   - **Example**: `cache/cached_embeddings.npy`
+
+2. **`/src/core/cache/`** (source code)
+   - **Purpose**: Python CODE that MANAGES the cache
+   - **Contains**: `.py` modules (`manager.py`, `hashing.py`)
+   - **Type**: Application logic
+   - **Example**: `core/cache/manager.py` writes to `/cache/`
+
+**Analogy**: `/cache/` is the warehouse, `/core/cache/` is the warehouse management software.
+
+---
+
+## 🎛️ Configuration System (CRITICAL)
+
+### Golden Rule: Everything in config.toml
+**NEVER hardcode**: Model names, API endpoints, dimensions, k-values, prompts, paths
+
+### Current Active Configuration
+```toml
+[llm]
+provider = "openai"           # Can be: "openai" or "ollama"
+parseModel = "gpt-4o-2024-08-06"  # For structured output
+model = "gpt-4o-mini"         # For chat/generation
+
+[embedding]
+provider = "openai"           # Can be: "openai" or "ollama"
+model = "text-embedding-3-small"
+
+[vectorDB]
+dim = 1536                    # ⚠️ MUST match embedding model output!
+                              # text-embedding-3-small: 1536
+                              # text-embedding-3-large: 3072
+                              # nomic-embed-text (Ollama): 768
+
+[chunking]
+chunkSize = 300               # Words per chunk
+overlap = 60                  # Overlapping words
+minChunkChars = 150           # Minimum chunk size
+
+[retrieval]
+vectorTopK = 20               # Vector search results
+bm25TopK = 20                 # BM25 search results
+rerankTopK = 10               # Candidates to rerank
+contextTopK = 5               # Final results sent to LLM
+
+[reranker]
+model = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+topK = 10
+
+[conversation]
+maxHistory = 10               # Conversation turns to keep
+systemPrompt = "You are a helpful assistant..."
+```
+
+### How to Use Config in Code
+
+```python
+# ✅ CORRECT: Load config once, pass to services
+from vector_embedding.core.config import Config
+
+config = Config.from_file(Path("config.toml"))
+service = EmbeddingService(config)
+
+# Inside service:
+class EmbeddingService:
+    def __init__(self, config: Config):
+        self.config = config
+        self.model = config.embedding.model  # Access internally
+        self.provider = config.embedding.provider
+
+# ❌ WRONG: Don't pass individual values
+service = EmbeddingService(model="gpt-4", provider="openai")  # NO!
+
+# ❌ WRONG: Don't hardcode
+self.model = "gpt-4o-mini"  # NO!
+
+# ✅ CORRECT: Use config
+self.model = self.config.llm.model  # YES!
+```
+
+### Provider Switching
+
+To switch between OpenAI and Ollama, just edit `config.toml`:
+
+```toml
+# For OpenAI (requires OPENAI_API_KEY in .env)
+[llm]
+provider = "openai"
+model = "gpt-4o-mini"
+
+[embedding]
+provider = "openai"
+model = "text-embedding-3-small"
+
+[vectorDB]
+dim = 1536  # Match OpenAI embedding dimension
+
+# For Ollama (local, no API key needed, must be running)
+[llm]
+provider = "ollama"
+model = "llama3.1:8b"
+
+[embedding]
+provider = "ollama"
+model = "nomic-embed-text"
+
+[vectorDB]
+dim = 768  # Match Ollama nomic-embed-text dimension
+
+# Mixed setup is OK!
+[llm]
+provider = "ollama"  # Local LLM
+
+[embedding]
+provider = "openai"  # Cloud embeddings
+model = "text-embedding-3-small"
+
+[vectorDB]
+dim = 1536  # Must match embedding provider
+```
+
+---
+
+## 🔄 System Data Flow
+
+### Query Flow (RAGPipeline.ask())
+```
+User Query
+    ↓
+1. Embed query with EmbeddingService
+    ↓
+2. Parallel Search:
+    ├─→ VectorDB.search() → top 20 vector results
+    └─→ BM25Index.search() → top 20 BM25 results
+    ↓
+3. Merge & Deduplicate (by text content)
+    ↓
+4. RerankerService.rerank() → top 10 reranked
+    ↓
+5. Select contextTopK (5) best results
+    ↓
+6. Format context with metadata (filename, page)
+    ↓
+7. Build messages (system + context + history + query)
+    ↓
+8. LLMChat.chat() → Generate answer
+    ↓
+9. Add to conversation history
+    ↓
+Answer + Sources
+```
+
+### Initialization Flow (DocumentRAGSystem.initialize())
+```
+1. CacheManager.get_file_changes()
+   └─→ Compare current files vs cached metadata (MD5 hashes)
+       └─→ Detect: new, changed, removed files
+    ↓
+2. Decision Tree:
+   ├─→ Cache valid & no changes?
+   │   └─→ RAGPipeline.from_cache() [Fast path]
+   │
+   ├─→ Files changed?
+   │   └─→ incremental_update()
+   │       ├─→ Keep unchanged file chunks
+   │       ├─→ Reload only changed files
+   │       └─→ Merge & re-embed
+   │
+   └─→ No cache?
+       └─→ data_pipeline() [Full processing]
+           ├─→ Load ALL PDFs with load_and_chunk_pdf()
+           ├─→ Generate embeddings (batch)
+           ├─→ Build FAISS index
+           └─→ Save cache
+```
+
+### Document Processing
+```
+PDF File
+    ↓
+load_pdf() - Extract text with PyMuPDF
+    ↓
+Clean text (regex preprocessing)
+    ↓
+Chunk by words (configurable size + overlap)
+    ↓
+Create metadata (filename, page, category)
+    ↓
+Embed chunks (EmbeddingService)
+    ↓
+Store in VectorDB + BM25Index
+```
+
+---
+
+## 🎨 Common Code Patterns
+
+### 1. Service Pattern
+```python
+# All major components are services that manage their own config
+
+class MyService:
+    def __init__(self, config: Config):
+        self.config = config
+        self.param = config.section.param  # Access config internally
+        
+    def do_work(self, input):
+        # Use self.config internally, don't pass it around
+        return result
+```
+
+### 2. Cache Pattern
+```python
+# Use CacheManager for all file caching
+
+from vector_embedding.core.cache import CacheManager
+
+cacheManager = CacheManager(cacheDir="cache", dataDir="data")
+fileChanges = cacheManager.get_file_changes()  # Returns dict with new/changed/removed
+
+# Check cache validity
+if not fileChanges["newFiles"] and not fileChanges["changedFiles"]:
+    # Use cache
+    pipeline = RAGPipeline.from_cache(...)
+else:
+    # Reprocess
+    pipeline = incremental_update(fileChanges)
+```
+
+### 3. Lazy Loading Pattern (in __init__.py)
+```python
+# Used in main __init__.py for performance
+
+def __getattr__(name):
+    if name == "DocumentRAGSystem":
+        from .system import DocumentRAGSystem
+        return DocumentRAGSystem
+    raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
+
+__all__ = ["DocumentRAGSystem"]
+```
+
+### 4. Message Building Pattern
+```python
+# LLM messages always follow this structure
+
+messages = [
+    {"role": "system", "content": systemPrompt},
+    {"role": "user", "content": context},
+    # ... conversation history ...
+    {"role": "user", "content": query}
+]
+
+response = llmClient.chat(messages)
+```
+
+### 5. Import Pattern
+```python
+# Relative imports within package
+from .embeddings import EmbeddingService
+from ..config import Config
+from ...system import DocumentRAGSystem
+
+# Absolute imports for external
+import numpy as np
+from openai import OpenAI
+from config import Config  # Root-level config (legacy, should be relative)
+```
+
+---
+
+## 🚨 Common Mistakes & Gotchas
+
+### 1. Vector Dimension Mismatch ⚠️
+```python
+# ❌ WRONG: Dimension doesn't match embedding model
+[embedding]
+model = "text-embedding-3-small"  # Outputs 1536 dims
+
+[vectorDB]
+dim = 768  # MISMATCH! Will crash!
+
+# ✅ CORRECT: Match dimensions
+[embedding]
+model = "text-embedding-3-small"
+
+[vectorDB]
+dim = 1536  # Matches model output
+```
+
+**Dimension Reference**:
+- OpenAI `text-embedding-3-small`: **1536**
+- OpenAI `text-embedding-3-large`: **3072**
+- Ollama `nomic-embed-text`: **768**
+
+### 2. Cache Directory Confusion ⚠️
+```python
+# ❌ WRONG: Confusing data cache with code
+from cache.manager import CacheManager  # NO! cache/ is data, not code
+
+# ✅ CORRECT: Import from code location
+from vector_embedding.core.cache.manager import CacheManager
+# or with relative import:
+from .core.cache.manager import CacheManager
+```
+
+### 3. Hardcoded Configuration ⚠️
+```python
+# ❌ WRONG: Hardcoded values
+self.model = "gpt-4o-mini"
+self.topK = 5
+
+# ✅ CORRECT: Use config
+self.model = self.config.llm.model
+self.topK = self.config.retrieval.contextTopK
+```
+
+### 4. Inline Prompts ⚠️
+```python
+# ❌ WRONG: Prompt in business logic
+def ask(self, query):
+    prompt = f"You are a helpful assistant. Context: {context}"
+    # ... more logic ...
+
+# ✅ CORRECT: Prompts in prompts.py
+from ..llm.prompts import build_rag_messages
+
+def ask(self, query):
+    messages = build_rag_messages(context, query, history)
+    # ... more logic ...
+```
+
+### 5. Missing __init__.py ⚠️
+```python
+# ❌ WRONG: New package without __init__.py
+new_package/
+    module.py  # Can't import!
+
+# ✅ CORRECT: Always add __init__.py
+new_package/
+    __init__.py  # Even if empty!
+    module.py
+```
+
+### 6. API Key Security ⚠️
+```python
+# ❌ WRONG: API key in code or config
+api_key = "sk-1234..."  # NEVER!
+
+# ✅ CORRECT: In .env file (gitignored)
+# .env file:
+OPENAI_API_KEY=sk-1234...
+
+# In code:
+import os
+api_key = os.getenv("OPENAI_API_KEY")
+```
+
+### 7. Absolute Imports Within Package ⚠️
+```python
+# ❌ WRONG: Absolute import for same package
+from src.vector_embedding.core.embeddings import EmbeddingService
+
+# ✅ CORRECT: Relative import
+from .embeddings import EmbeddingService
+from ..core.embeddings import EmbeddingService
+```
+
+---
+
+## 📦 Dependencies
+
+### Critical Dependencies (Must Have)
+```toml
+faiss-cpu             # Vector similarity search (CRITICAL)
+openai                # OpenAI API (if using OpenAI provider)
+ollama                # Ollama API (if using Ollama provider)
+numpy                 # Numerical operations
+python-dotenv         # .env file loading
+pymupdf               # PDF text extraction
+sentence-transformers # Cross-encoder reranking
+rank-bm25             # BM25 keyword search
+pydantic              # Data validation (for semantic profiling)
+```
+
+### Development Dependencies
+```toml
+ruff                  # Linting
+black                 # Code formatting
+pytest                # Testing (when added)
+```
+
+### Optional Dependencies
+```toml
+tenacity              # Retry logic
+ragas                 # RAG evaluation
+langsmith             # Monitoring
+langchain             # Framework components
+langchain-openai      # LangChain OpenAI integration
+```
+
+### Installation
+```bash
+# Create venv
+python -m venv vector_venv
+source vector_venv/bin/activate  # On Windows: vector_venv\Scripts\activate
+
+# Install dependencies
+pip install -r requirements.txt
+# or
+pip install -e .  # If using pyproject.toml
+```
+
+---
+
+## 🧪 Testing Guidelines
+
+### Test Structure (When Added)
+```
+tests/
+├── __init__.py
+├── conftest.py              # Pytest fixtures
+├── unit/                    # Unit tests (fast, isolated)
+│   ├── test_embeddings.py
+│   ├── test_vectordb.py
+│   ├── test_bm25.py
+│   ├── test_cache_manager.py
+│   └── test_loader.py
+├── integration/             # Integration tests (slower, E2E)
+│   ├── test_rag_pipeline.py
+│   └── test_system.py
+└── fixtures/                # Test data
+    └── sample.pdf
+```
+
+### Testing Principles
+- Mirror source structure in tests
+- Use pytest for all tests
+- Mock external API calls (OpenAI, Ollama)
+- Test with small fixture data
+- Test both providers (OpenAI + Ollama)
+
+---
+
+## 📝 Documentation Standards
+
+### Function Docstrings (Google Style)
+```python
+def load_and_chunk_pdf(pdfPath: str, config: Config) -> List[Dict[str, Any]]:
+    """
+    Load PDF and split into word-based overlapping chunks.
+    
+    Extracts text from PDF using PyMuPDF, cleans it with regex,
+    and splits into chunks based on word count with overlap.
+    
+    Args:
+        pdfPath: Absolute path to PDF file
+        config: Configuration object with chunking parameters
+        
+    Returns:
+        List of chunk dictionaries with keys:
+        - text: Chunk text content
+        - metadata: Dict with filename, page, category
+        
+    Raises:
+        FileNotFoundError: If PDF doesn't exist
+        ValueError: If PDF is empty or unreadable
+    """
+```
+
+### Module Docstrings
+```python
+"""
+Document loading and chunking utilities.
+
+This module provides functions for loading PDFs and splitting them
+into overlapping word-based chunks for embedding and retrieval.
+"""
+```
+
+### Inline Comments
+```python
+# Why, not what - explain reasoning, not obvious code
+# GOOD: "Use MD5 for fast change detection (not cryptographic security)"
+# BAD:  "Compute MD5 hash"
+```
+
+---
+
+## 🔧 Development Workflow
+
+### Adding New Features
+
+#### New Retrieval Method
+1. Create in `core/retrieval/`
+2. Implement search interface: `search(query, k) -> results`
+3. Add config section to `config.toml`
+4. Integrate in `RAGPipeline.ask()`
+5. Update `core/retrieval/__init__.py`
+6. Add tests
+7. Update README
+
+#### New Document Type
+1. Add loader function in `core/documents/loader.py`
+2. Implement chunking strategy
+3. Update `DocumentRAGSystem.data_pipeline()`
+4. Update file detection in `CacheManager`
+5. Add tests with sample files
+6. Update README
+
+#### New Analysis Feature
+1. Create in `core/analysis/`
+2. Add to `MetadataExtractor` schema if needed
+3. Add analysis logic in `InsightEngine`
+4. Update orchestration in `metrics.py`
+5. Add tests
+6. Update README
+
+### Refactoring Checklist
+- [ ] Maintain naming conventions
+- [ ] Update all affected imports
+- [ ] Update `__init__.py` files
+- [ ] Run tests (when available)
+- [ ] Update docstrings
+- [ ] Update README if API changed
+
+### Before Committing
+- [ ] No API keys or secrets in code
+- [ ] No cache files committed (check .gitignore)
+- [ ] Code follows naming conventions
+- [ ] Docstrings added for new functions
+- [ ] Config changes documented in README
+
+---
+
+## 🐛 Debugging Tips
+
+### Common Issues
+
+**"Dimension mismatch in FAISS"**
+→ Check `config.toml`: `[vectorDB] dim` must match embedding model output
+
+**"Module not found" errors**
+→ Check for `__init__.py` in all package directories
+
+**"OpenAI API error"**
+→ Verify `OPENAI_API_KEY` in `.env` file
+→ Check API key has credits
+→ Ensure `.env` is loaded (should happen in `__init__.py`)
+
+**"Ollama connection refused"**
+→ Start Ollama: `ollama serve`
+→ Pull model: `ollama pull llama3.1:8b`
+→ Verify model name matches `config.toml`
+
+**"Empty results from search"**
+→ Check if documents were processed: verify `cache/` has files
+→ Check if embeddings generated: `cache/cached_embeddings.npy` should exist
+→ Verify document format (only PDFs supported)
+
+**"Cache not updating"**
+→ Force rebuild by deleting `cache/` directory
+→ Check file permissions on `cache/`
+→ Verify `CacheManager` is computing MD5 correctly
+
+---
+
+## 📊 Performance Considerations
+
+### Optimization Strategies
+1. **Caching**: Always use cache for unchanged files (already implemented)
+2. **Batch Processing**: Use `get_embedding_batch()` not loops of `get_embedding_single()`
+3. **Lazy Loading**: Main `__init__.py` uses lazy loading for heavy modules
+4. **Incremental Updates**: Only reprocess changed files (already implemented)
+5. **FAISS Index**: HNSW is approximate but fast (good for < 10k documents)
+
+### Scaling Thresholds
+- **Current**: Optimized for 10-100 documents
+- **100-1000 docs**: Current architecture OK, may need larger FAISS index
+- **1000+ docs**: Consider database-backed vector store (Pinecone, Weaviate, Qdrant)
+
+---
+
+## 🎯 Project Roadmap & TODOs
+
+### Immediate TODOs
+- [ ] Create `core/llm/prompts.py` - extract all prompts from business logic
+- [ ] Add missing `__init__.py` files in all packages
+- [ ] Rename project directory to remove spaces: `Vector Embedding` → `vector-embedding`
+- [ ] Move duplicate `llm_view.json` from root to cache/
+- [ ] Fix import inconsistencies (use relative imports everywhere)
+
+### Short-term Enhancements
+- [ ] Add `tests/` directory with pytest suite
+- [ ] Add `logs/` directory for application logging
+- [ ] Add `examples/` directory with usage examples
+- [ ] Create `ARCHITECTURE.md` with detailed design docs
+- [ ] Add CLI commands beyond chat (analyze, benchmark, etc.)
+
+### Long-term Features
+- [ ] Support more document types (Word, Markdown, HTML)
+- [ ] Add more embedding providers (Cohere, Anthropic)
+- [ ] Real-time document updates (file watching)
+- [ ] Web UI (Gradio or Streamlit)
+- [ ] Query optimization and caching
+- [ ] Multi-language support
+- [ ] Evaluation framework (RAGAS integration)
+
+---
+
+## 🤝 Contributing & Collaboration
+
+### When Working with AI Assistants
+
+**DO**:
+- Reference this file: `@.cursorrules`
+- Ask to explain architectural decisions
+- Request code that follows conventions
+- Have AI update this file when patterns change
+
+**DON'T**:
+- Assume AI knows project structure without context
+- Accept code that violates conventions
+- Let AI make breaking changes without review
+
+### Code Review Checklist
+- [ ] Follows naming conventions (snake_case/camelCase/PascalCase)
+- [ ] Uses config.toml, no hardcoding
+- [ ] Prompts in prompts.py, not inline
+- [ ] Has docstrings (Google style)
+- [ ] Proper imports (relative within package)
+- [ ] No secrets committed
+- [ ] Updates affected `__init__.py` files
+
+---
+
+## 🔐 Security & Privacy
+
+### API Key Management
+- Store in `.env` file (in .gitignore)
+- Load with `python-dotenv` in main `__init__.py`
+- Never commit to git
+- Never log in plain text
+
+### Data Privacy
+- All processing local except LLM API calls
+- PDFs never sent to APIs (only chunks sent for embedding/chat)
+- Cache stored locally
+- No telemetry or tracking
+
+### Input Validation
+- Validate file types before processing
+- Limit file sizes to prevent DoS
+- Sanitize user queries
+- Handle errors gracefully without exposing internals
+
+---
+
+## 📚 Key Files Reference
+
+### Must-Read Files
+- `system.py`: Entry point, initialization logic
+- `pipeline/rag.py`: Core RAG orchestration
+- `config.toml`: All configurable parameters
+- `core/config/config.py`: Configuration data structures
+
+### Frequently Modified
+- `config.toml`: Switching providers, tuning parameters
+- `core/llm/prompts.py`: Prompt engineering (TODO: create this!)
+- `core/analysis/metrics.py`: Analysis logic
+- `.env`: API keys (local only)
+
+### Reference-Only (Rarely Changed)
+- `core/cache/hashing.py`: MD5 computation
+- `core/retrieval/vectordb.py`: FAISS wrapper
+- `core/documents/loader.py`: PDF processing
+
+---
+
+## 🎓 Learning Resources
+
+### Understanding RAG
+- This system implements: Query → Embed → Retrieve (BM25+Vector) → Rerank → Generate
+
+### Understanding FAISS
+- HNSW = Hierarchical Navigable Small World graph
+- Approximate nearest neighbor (fast but not exact)
+- Good for < 1M vectors
+
+### Understanding BM25
+- Best Match 25 - probabilistic ranking algorithm
+- Good for exact term matching (names, acronyms, codes)
+- Complements semantic search
+
+### Understanding Cross-Encoders
+- Reranker model that scores query-document pairs
+- More accurate than bi-encoders (but slower)
+- Used as final reranking step
+
+---
+
+## 💡 Design Philosophy
+
+1. **Configuration over Code**: Change behavior via config.toml, not code edits
+2. **Separation of Concerns**: Data separate from code (cache/ vs core/cache/)
+3. **Service Pattern**: Each component manages its own state and config
+4. **Fail Fast**: Validate config early, raise descriptive errors
+5. **Cache Aggressively**: Embeddings are expensive, cache everything
+6. **Provider Agnostic**: Support both cloud (OpenAI) and local (Ollama) models
+7. **Hybrid Search**: Combine keyword + semantic for best results
+8. **Incremental Updates**: Only reprocess what changed
+
+---
+
+## ✅ Final Checklist for AI Assistants
+
+When making changes, ensure:
+- [ ] Naming conventions followed (snake_case/camelCase/PascalCase)
+- [ ] Config used, no hardcoding
+- [ ] Prompts in prompts.py (when created)
+- [ ] Docstrings added (Google style)
+- [ ] Imports correct (relative within package)
+- [ ] `__init__.py` updated if adding modules
+- [ ] No secrets in code
+- [ ] Cache structure respected (data vs code)
+- [ ] Type hints on function signatures
+- [ ] Error handling added
+- [ ] This file updated if conventions change
+
+---
+
+**Last Updated**: 2026-01-07
+**Maintainer**: Anmol Baruwal
+**AI Assistant**: Use this file as authoritative reference for all development tasks
