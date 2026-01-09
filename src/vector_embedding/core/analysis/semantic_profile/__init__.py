@@ -1,17 +1,14 @@
 """
-Semantic Profile Module
+Semantic Profile Module.
 
-This module provides tools for extracting structured metadata from documents
-and generating insights from that metadata.
+Provides atomic claims extraction and deterministic insights.
 """
 
-from .extractor import MetadataExtractor, DocumentMetadata, CompanyProfile
+from .extractor import AtomicClaimsExtractor, MetadataExtractor
 from .insights import InsightEngine
 
 __all__ = [
+    "AtomicClaimsExtractor",
     "MetadataExtractor",
-    "DocumentMetadata", 
-    "CompanyProfile",
     "InsightEngine"
 ]
-

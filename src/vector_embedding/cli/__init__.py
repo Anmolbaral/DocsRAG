@@ -1,3 +1,3 @@
-from .chat import ChatInterface
+from .chat import main
 
-__all__ = ["ChatInterface"]
+__all__ = ["main"]

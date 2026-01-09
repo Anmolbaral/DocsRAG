@@ -1,115 +1,356 @@
-import json
-import logging
-import pandas as pd
+"""
+Deterministic Insight Engine.
 
-# Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+Generates insights from atomic claims using pure logic (no LLM interpretation).
+All insights are traceable to source claims.
+"""
+import logging
+from typing import List, Dict, Any, Optional
+from collections import Counter, defaultdict
+
+from ..claims_db import ClaimsDatabase
+from ..schema import AtomicClaim
+
 logger = logging.getLogger(__name__)
 
+
 class InsightEngine:
-    def __init__(self, json_path="llm_view.json"):
+    """
+    Generates deterministic insights from claims database.
+    
+    All methods use pure logic and statistics - no LLM interpretation.
+    Results are reproducible and auditable.
+    """
+    
+    def __init__(self, db_path: str):
         """
-        Initialize InsightEngine with metadata from JSON file.
+        Initialize insight engine.
         
         Args:
-            json_path: Path to the JSON file containing document metadata
+            db_path: Path to claims.json database
         """
-        logger.info(f"Loading metadata from: {json_path}")
-        
-        with open(json_path, "r") as f:
-            self.data = json.load(f)
-        
-        self.df = pd.DataFrame(self.data)
-        
-        if self.df.empty:
-            logger.warning("DataFrame is empty - no documents to analyze")
-        else:
-            logger.info(f"Loaded {len(self.df)} documents")
-            if 'docType' in self.df.columns:
-                doc_types = self.df['docType'].value_counts().to_dict()
-                logger.info(f"Document types: {doc_types}")
-
-    def find_missing_skills(self):
+        self.db = ClaimsDatabase(db_path)
+        logger.info(f"Loaded {len(self.db)} claims from database")
+    
+    def get_top_skills(
+        self, 
+        min_confidence: float = 0.7, 
+        limit: int = 20,
+        context_filter: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
         """
-        Find skills that appear in research papers but not in resume.
+        Get top skills ranked by frequency and confidence.
         
-        Logic: Skills in Papers - Skills in Resume = The Gap
+        Args:
+            min_confidence: Minimum confidence threshold
+            limit: Max number of skills to return
+            context_filter: Optional context filter (production, academic, etc.)
+            
+        Returns:
+            List of skill dicts with value, count, avg_confidence, contexts
+        """
+        # Query skill claims
+        filters = {
+            "claim_type": "skill",
+            "confidence": {"$gte": min_confidence}
+        }
+        if context_filter:
+            filters["context"] = context_filter
+        
+        skill_claims = self.db.query(filters)
+        
+        # Aggregate by value
+        skill_data = defaultdict(lambda: {
+            "claims": [],
+            "contexts": set(),
+            "confidences": []
+        })
+        
+        for claim in skill_claims:
+            skill_data[claim.value]["claims"].append(claim)
+            skill_data[claim.value]["contexts"].add(claim.context)
+            skill_data[claim.value]["confidences"].append(claim.confidence)
+        
+        # Calculate stats
+        results = []
+        for skill, data in skill_data.items():
+            results.append({
+                "value": skill,
+                "count": len(data["claims"]),
+                "avg_confidence": sum(data["confidences"]) / len(data["confidences"]),
+                "contexts": sorted(list(data["contexts"])),
+                "evidence_count": len(data["claims"])
+            })
+        
+        # Sort by count (primary) and avg_confidence (secondary)
+        results.sort(key=lambda x: (x["count"], x["avg_confidence"]), reverse=True)
+        
+        return results[:limit]
+    
+    def get_skill_progression(self) -> Dict[str, List[Dict[str, Any]]]:
+        """
+        Get timeline of skill acquisition.
         
         Returns:
-            Dictionary with 'presentInPapers' and 'missingFromResume' lists
+            Dict mapping date -> list of skills first appearing on that date
         """
-        logger.info("Analyzing skill gaps...")
+        skill_claims = self.db.get_by_type("skill")
         
-        # Check if DataFrame is empty or missing required columns
-        if self.df.empty:
-            logger.warning("No data to analyze - empty DataFrame")
-            return {
-                "presentInPapers": [],
-                "missingFromResume": []
+        # Track first appearance of each skill
+        skill_first_seen = {}
+        
+        for claim in skill_claims:
+            if claim.value not in skill_first_seen:
+                skill_first_seen[claim.value] = claim.document_date
+            else:
+                # Keep earliest date
+                if claim.document_date < skill_first_seen[claim.value]:
+                    skill_first_seen[claim.value] = claim.document_date
+        
+        # Group by date
+        timeline = defaultdict(list)
+        for skill, date in skill_first_seen.items():
+            timeline[date].append(skill)
+        
+        # Sort dates
+        return dict(sorted(timeline.items()))
+    
+    def get_context_breakdown(
+        self, 
+        claim_type: Optional[str] = None
+    ) -> Dict[str, Dict[str, Any]]:
+        """
+        Get breakdown of claims by context.
+        
+        Args:
+            claim_type: Optional filter by claim type
+            
+        Returns:
+            Dict mapping context -> stats
+        """
+        if claim_type:
+            claims = self.db.get_by_type(claim_type)
+        else:
+            claims = list(self.db.claims.values())
+        
+        context_data = defaultdict(lambda: {
+            "count": 0,
+            "claim_types": Counter(),
+            "avg_confidence": [],
+            "unique_values": set()
+        })
+        
+        for claim in claims:
+            context_data[claim.context]["count"] += 1
+            context_data[claim.context]["claim_types"][claim.claim_type] += 1
+            context_data[claim.context]["avg_confidence"].append(claim.confidence)
+            context_data[claim.context]["unique_values"].add(claim.value)
+        
+        # Calculate averages
+        results = {}
+        for context, data in context_data.items():
+            results[context] = {
+                "count": data["count"],
+                "claim_types": dict(data["claim_types"]),
+                "avg_confidence": sum(data["avg_confidence"]) / len(data["avg_confidence"]),
+                "unique_values": len(data["unique_values"])
             }
         
-        if 'docType' not in self.df.columns or 'hardSkills' not in self.df.columns:
-            logger.error(f"Missing required columns. Available: {list(self.df.columns)}")
-            return {
-                "presentInPapers": [],
-                "missingFromResume": []
-            }
+        return results
+    
+    def get_missing_skills(self) -> Dict[str, List[str]]:
+        """
+        Find skills present in research/academic but missing from resumes.
         
-        # 1. Get all skills mentioned in Papers
+        Returns:
+            Dict with presentInPapers and missingFromResume
+        """
+        # Get skills by document type (inferred from filename patterns)
+        all_skills = self.db.get_by_type("skill")
+        
         paper_skills = set()
-        paper_docs = self.df[self.df['docType'] == "research_paper"]
-        
-        if not paper_docs.empty:
-            logger.info(f"Found {len(paper_docs)} research paper(s)")
-            for skills in paper_docs['hardSkills']:
-                if isinstance(skills, list):
-                    paper_skills.update([s.lower() for s in skills])
-            logger.info(f"Extracted {len(paper_skills)} unique skills from papers")
-        else:
-            logger.info("No research papers found")
-
-        # 2. Get all skills mentioned in Resume
         resume_skills = set()
-        resume_docs = self.df[self.df['docType'] == 'resume']
         
-        if not resume_docs.empty:
-            logger.info(f"Found {len(resume_docs)} resume(s)")
-            for skills in resume_docs['hardSkills']:
-                if isinstance(skills, list):
-                    resume_skills.update([s.lower() for s in skills])
-            logger.info(f"Extracted {len(resume_skills)} unique skills from resume")
-        else:
-            logger.warning("No resume found!")
-
-        # 3. STRICT MATH: What is in A but not B?
+        for claim in all_skills:
+            filename = claim.evidence.filename.lower()
+            
+            # Classify by filename
+            if "research" in filename or "paper" in filename or ".tex" in filename:
+                paper_skills.add(claim.value)
+            elif "resume" in filename or "cv" in filename:
+                resume_skills.add(claim.value)
+        
+        # Find gaps
         missing = paper_skills - resume_skills
-        
-        if missing:
-            logger.warning(f"Found {len(missing)} skills missing from resume: {sorted(list(missing))[:10]}{'...' if len(missing) > 10 else ''}")
-        else:
-            logger.info("✓ All paper skills are present in resume")
         
         return {
             "presentInPapers": sorted(list(paper_skills)),
-            "missingFromResume": sorted(list(missing))
+            "missingFromResume": sorted(list(missing)),
+            "inResume": sorted(list(resume_skills))
         }
-
-    def analyze_tone_consistency(self):
+    
+    def get_value_profile(
+        self, 
+        min_confidence: float = 0.7
+    ) -> List[Dict[str, Any]]:
         """
-        Compare tone scores across different document types.
+        Get inferred values from claims.
+        
+        Args:
+            min_confidence: Minimum confidence threshold
+            
+        Returns:
+            List of value dicts with frequency and evidence
+        """
+        value_claims = self.db.query({
+            "claim_type": "value",
+            "confidence": {"$gte": min_confidence}
+        })
+        
+        # Count frequency
+        value_counts = Counter([claim.value for claim in value_claims])
+        
+        results = []
+        for value, count in value_counts.most_common():
+            results.append({
+                "value": value,
+                "frequency": count,
+                "evidence_count": count
+            })
+        
+        return results
+    
+    def get_achievements_by_impact(self) -> List[Dict[str, Any]]:
+        """
+        Get achievements sorted by confidence (proxy for impact).
         
         Returns:
-            Dictionary mapping document types to average tone scores
+            List of achievement dicts
         """
-        logger.info("Analyzing tone consistency...")
+        achievements = self.db.get_by_type("achievement")
         
-        if self.df.empty or 'docType' not in self.df.columns or 'toneScore' not in self.df.columns:
-            logger.warning("Cannot analyze tone - missing required columns")
-            return {}
+        # Sort by confidence (explicit achievements ranked higher)
+        achievements.sort(key=lambda x: x.confidence, reverse=True)
         
-        tone_by_type = self.df.groupby('docType')['toneScore'].mean().to_dict()
+        results = []
+        for claim in achievements:
+            results.append({
+                "value": claim.value,
+                "confidence": claim.confidence,
+                "context": claim.context,
+                "date": claim.document_date,
+                "source": f"{claim.evidence.filename} (p.{claim.evidence.page})"
+            })
         
-        for doc_type, score in tone_by_type.items():
-            logger.info(f"  {doc_type}: {score:.1f}/10")
+        return results
+    
+    def get_experience_timeline(self) -> Dict[str, List[Dict[str, Any]]]:
+        """
+        Get timeline of experiences.
         
-        return tone_by_type
+        Returns:
+            Dict mapping date -> list of experiences
+        """
+        experiences = self.db.get_by_type("experience")
+        
+        timeline = defaultdict(list)
+        
+        for claim in experiences:
+            timeline[claim.document_date].append({
+                "value": claim.value,
+                "context": claim.context,
+                "confidence": claim.confidence,
+                "source": claim.evidence.filename
+            })
+        
+        return dict(sorted(timeline.items()))
+    
+    def get_growth_metrics(self) -> Dict[str, Any]:
+        """
+        Calculate growth metrics across time.
+        
+        Returns:
+            Dict with various growth statistics
+        """
+        timeline = self.db.get_timeline()
+        
+        if not timeline:
+            return {"error": "No timeline data available"}
+        
+        # Calculate metrics
+        dates = sorted(timeline.keys())
+        
+        # Skills over time
+        cumulative_skills = set()
+        skills_by_date = {}
+        
+        for date in dates:
+            date_skills = [
+                claim.value for claim in timeline[date]
+                if claim.claim_type == "skill"
+            ]
+            cumulative_skills.update(date_skills)
+            skills_by_date[date] = {
+                "new_skills": len(date_skills),
+                "cumulative": len(cumulative_skills)
+            }
+        
+        return {
+            "date_range": {
+                "earliest": dates[0],
+                "latest": dates[-1]
+            },
+            "skills_progression": skills_by_date,
+            "total_growth": len(cumulative_skills)
+        }
+    
+    def generate_summary_report(self) -> Dict[str, Any]:
+        """
+        Generate complete summary report.
+        
+        Returns:
+            Comprehensive summary of all insights
+        """
+        return {
+            "database_stats": self.db.get_stats(),
+            "top_skills": self.get_top_skills(limit=10),
+            "context_breakdown": self.get_context_breakdown(),
+            "missing_skills": self.get_missing_skills(),
+            "value_profile": self.get_value_profile(),
+            "growth_metrics": self.get_growth_metrics()
+        }
+
+
+if __name__ == "__main__":
+    """Generate insights report from claims database."""
+    import json
+    from pathlib import Path
+    from ...utils import get_project_root
+    
+    project_root = get_project_root()
+    db_path = project_root / "cache" / "claims.json"
+    
+    if not db_path.exists():
+        print(f"Error: Claims database not found at {db_path}")
+        print("Run extractor.py first to generate claims.")
+        exit(1)
+    
+    # Generate insights
+    engine = InsightEngine(str(db_path))
+    report = engine.generate_summary_report()
+    
+    # Save report
+    report_path = project_root / "cache" / "insights_report.json"
+    with open(report_path, 'w') as f:
+        json.dump(report, f, indent=2)
+    
+    print(f"\n{'='*60}")
+    print("Insights Report Generated")
+    print(f"{'='*60}\n")
+    print(f"Saved to: {report_path}\n")
+    
+    # Print summary
+    print("Summary:")
+    print(f"  Total Claims: {report['database_stats']['total_claims']}")
+    print(f"  Top 5 Skills: {[s['value'] for s in report['top_skills'][:5]]}")
+    print(f"  Missing from Resume: {len(report['missing_skills']['missingFromResume'])} skills")

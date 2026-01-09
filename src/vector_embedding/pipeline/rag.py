@@ -79,12 +79,16 @@ class RAGPipeline:
         obj.bm25Index = BM25Index(obj.texts, config)
         obj._chatClient = LLMChat(config) if chatClient is None else chatClient
 
+        # Populate the vector database with cached embeddings
+        metadataList = [chunk["metadata"] for chunk in obj.chunks]
+        obj.db.add(obj.embeddings, obj.texts, metadataList)
+
         # Initialize conversation history
         obj.conversationHistory = []
         return obj
 
     def ask(self, query):
-        if not self.chunks or not self.embeddings:
+        if not self.chunks or len(self.embeddings) == 0:
             raise ValueError("Cannot query: No documents loaded.")
 
         queryEmb = self.embeddingService.get_embedding_single(query)

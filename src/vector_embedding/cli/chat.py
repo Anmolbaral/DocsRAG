@@ -1,5 +1,5 @@
 import sys
-from src.vector_embedding.system import DocumentRAGSystem
+from ..system import DocumentRAGSystem
 
 
 def main():
