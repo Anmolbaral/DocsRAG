@@ -13,7 +13,7 @@ def test_creates_cache_dir(temp_dir):
     data_dir = temp_dir / "data"
     data_dir.mkdir()
 
-    manager = CacheManager(str(cache_dir), str(data_dir))
+    CacheManager(str(cache_dir), str(data_dir))
 
     assert cache_dir.exists()
 

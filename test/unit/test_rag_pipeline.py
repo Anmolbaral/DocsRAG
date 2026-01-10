@@ -113,7 +113,7 @@ def test_pipeline_from_cache_populates_index(mock_config, sample_chunks, tmp_pat
     embedder = MockEmbedder()
 
     # Create and cache
-    pipeline1 = RAGPipeline(
+    _ = RAGPipeline(
         sample_chunks,
         config=mock_config,
         embedder=embedder,
