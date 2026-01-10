@@ -13,11 +13,11 @@ from .semantic_profile.insights import InsightEngine
 __all__ = [
     "ClaimsDatabase",
     "AtomicClaim",
-    "EvidencePointer", 
+    "EvidencePointer",
     "ClaimExtractionResult",
     "Canonicalizer",
     "get_canonicalizer",
     "AtomicClaimsExtractor",
     "MetadataExtractor",
-    "InsightEngine"
+    "InsightEngine",
 ]

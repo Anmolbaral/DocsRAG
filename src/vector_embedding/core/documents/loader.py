@@ -23,7 +23,7 @@ def load_pdf(path: str) -> List[Dict[str, Any]]:
             page = doc[pageNum]
             text = page.get_text("text") or ""
             text = text.strip()
-            
+
             if not text:
                 continue
 
@@ -41,7 +41,7 @@ def load_pdf(path: str) -> List[Dict[str, Any]]:
                     },
                 }
             )
-        
+
         doc.close()
         return pages
 
@@ -53,11 +53,11 @@ def load_pdf(path: str) -> List[Dict[str, Any]]:
 # Chunk text into overlapping chunks
 # Returns list of dicts with "text" (chunk text) and "metadata" (includes chunkId).
 def chunk_text(
-    pages: List[Dict[str, Any]], 
+    pages: List[Dict[str, Any]],
     config: Config,
     chunkSize: int = None,
     overlap: int = None,
-    minChunkChars: int = None
+    minChunkChars: int = None,
 ) -> List[Dict[str, Any]]:
     # Use config defaults if not provided
     if chunkSize is None:
@@ -66,16 +66,14 @@ def chunk_text(
         overlap = config.chunking.overlap
     if minChunkChars is None:
         minChunkChars = config.chunking.minChunkChars
-    
+
     allChunks = []
 
     for page in pages:
         pageText = page["text"]
         pageMetadata = page["metadata"]
 
-        chunkTexts = create_overlap_chunks(
-            pageText, chunkSize, overlap
-        )
+        chunkTexts = create_overlap_chunks(pageText, chunkSize, overlap)
 
         for chunkIndex, chunkText in enumerate(chunkTexts):
             chunkText = chunkText.strip()
@@ -94,17 +92,17 @@ def chunk_text(
                     "metadata": chunkMetadata,
                 }
             )
-    
+
     return allChunks
 
 
 # Convenience function: Load PDF and chunk it (backward compatibility)
 def load_and_chunk_pdf(
-    path: str, 
+    path: str,
     config: Config,
     chunkSize: int = None,
     overlap: int = None,
-    minChunkChars: int = None
+    minChunkChars: int = None,
 ) -> List[Dict[str, Any]]:
     pages = load_pdf(path)
     return chunk_text(pages, config, chunkSize, overlap, minChunkChars)

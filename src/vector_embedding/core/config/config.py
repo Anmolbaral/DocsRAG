@@ -74,7 +74,7 @@ class Config:
             raise ValueError(f"Failed to load config from {configPath}: {e}")
 
         return cls.from_dict(config)
-    
+
     @classmethod
     def from_dict(cls, config: dict) -> "Config":
         """Create Config from dictionary (useful for testing)."""
@@ -82,16 +82,16 @@ class Config:
         llm_config = config.get("llm", {})
         if "parseModel" not in llm_config:
             llm_config["parseModel"] = llm_config.get("model", "gpt-4o-mini")
-        
+
         return cls(
             llm=LLMConfig(**llm_config),
             embedding=EmbeddingConfig(**config["embedding"]),
             vectorDB=VectorDBConfig(**config["vectorDB"]),
-            chunking=ChunkingConfig(**config.get("chunking", {
-                "chunkSize": 300,
-                "overlap": 60,
-                "minChunkChars": 150
-            })),
+            chunking=ChunkingConfig(
+                **config.get(
+                    "chunking", {"chunkSize": 300, "overlap": 60, "minChunkChars": 150}
+                )
+            ),
             retrieval=RetrievalConfig(**config["retrieval"]),
             reranker=RerankerConfig(**config["reranker"]),
             conversation=ConversationConfig(**config["conversation"]),
