@@ -30,6 +30,10 @@ class ExtractedClaim(BaseModel):
     value: str
     context: Literal["production", "academic", "internship", "hobby", "unknown"]
     confidence: float = Field(..., description="0.4=implicit, 0.7=clear, 1.0=explicit")
+    supporting_quote: str = Field(
+        ..., 
+        description="Exact text snippet from the page that supports this claim (verbatim, 1-3 sentences max)"
+    )
     notes: str = Field(default="", description="Optional notes about the claim")
 
 
@@ -66,6 +70,66 @@ class AtomicClaimsExtractor:
         self.loader = load_pdf
         self.canonicalizer = get_canonicalizer()
 
+    def find_span_in_text(
+        self, page_text: str, quote: str, context_window: int = 50
+    ) -> dict | None:
+        """
+        Find character offsets for quote in page text.
+        
+        Args:
+            page_text: Full text of the page
+            quote: Text snippet to locate
+            context_window: Number of characters to include before/after quote
+            
+        Returns:
+            Dict with start_char, end_char, context_before, context_after
+            or None if quote cannot be found
+        """
+        # Try exact match first (fastest)
+        pos = page_text.find(quote)
+        if pos != -1:
+            return {
+                'start_char': pos,
+                'end_char': pos + len(quote),
+                'context_before': page_text[max(0, pos - context_window):pos],
+                'context_after': page_text[pos + len(quote):pos + len(quote) + context_window]
+            }
+        
+        # Fallback: try normalized search (handle whitespace variations)
+        import re
+        
+        # Normalize whitespace in quote
+        normalized_quote = ' '.join(quote.split())
+        normalized_page = ' '.join(page_text.split())
+        
+        pos = normalized_page.find(normalized_quote)
+        if pos != -1:
+            # Approximate position in original text
+            # This is a rough estimate - good enough for most cases
+            approx_pos = int(pos * len(page_text) / len(normalized_page))
+            
+            # Search in a window around the approximate position
+            search_start = max(0, approx_pos - 100)
+            search_end = min(len(page_text), approx_pos + len(quote) + 100)
+            search_window = page_text[search_start:search_end]
+            
+            # Try to find quote in window
+            window_pos = search_window.find(quote)
+            if window_pos != -1:
+                actual_pos = search_start + window_pos
+                return {
+                    'start_char': actual_pos,
+                    'end_char': actual_pos + len(quote),
+                    'context_before': page_text[max(0, actual_pos - context_window):actual_pos],
+                    'context_after': page_text[actual_pos + len(quote):actual_pos + len(quote) + context_window]
+                }
+        
+        # If still not found, log warning and return None
+        logger.warning(
+            f"Could not locate quote in page text. Quote: '{quote[:50]}...'"
+        )
+        return None
+
     def extract_claims_from_page(
         self, page_text: str, page_num: int, filename: str
     ) -> ClaimExtractionResult:
@@ -88,6 +152,9 @@ class AtomicClaimsExtractor:
 Rules:
 - Extract ONLY explicit facts (skills, experiences, achievements, values, education)
 - Each claim must be atomic (one fact)
+- For EACH claim, provide the EXACT supporting_quote from the page text (copy verbatim)
+- Keep quotes concise (1-3 sentences max) but sufficient to verify the claim
+- The supporting_quote must appear exactly in the page text - do not paraphrase
 - Assign context: production, academic, internship, hobby, unknown
 - Assign confidence:
   * 1.0 = Explicitly stated with details
@@ -132,10 +199,36 @@ Extract all atomic claims from this page."""
                     extracted.claim_type, canonical_value, filename, page_num
                 )
 
-                # Create evidence pointer
-                evidence = EvidencePointer(
-                    filename=filename, page=page_num, text_hash=text_hash
-                )
+                # Find span in page text
+                span = self.find_span_in_text(page_text, extracted.supporting_quote)
+                
+                if span:
+                    # Create evidence pointer with span-level precision
+                    evidence = EvidencePointer(
+                        filename=filename,
+                        page=page_num,
+                        start_char=span['start_char'],
+                        end_char=span['end_char'],
+                        quote=extracted.supporting_quote,
+                        text_hash=text_hash,
+                        context_before=span['context_before'],
+                        context_after=span['context_after']
+                    )
+                else:
+                    # Fallback: use placeholder values if span not found
+                    logger.warning(
+                        f"Using placeholder span for claim: {canonical_value[:50]}"
+                    )
+                    evidence = EvidencePointer(
+                        filename=filename,
+                        page=page_num,
+                        start_char=0,
+                        end_char=len(extracted.supporting_quote),
+                        quote=extracted.supporting_quote,
+                        text_hash=text_hash,
+                        context_before="",
+                        context_after=""
+                    )
 
                 # Create atomic claim
                 claim = AtomicClaim(
@@ -276,11 +369,24 @@ Extract all atomic claims from this page."""
         return all_claims
 
 
-# For backwards compatibility and testing
+# For backwards compatibility (DEPRECATED - use AtomicClaimsExtractor instead)
 class MetadataExtractor(AtomicClaimsExtractor):
-    """Alias for backwards compatibility."""
+    """
+    Alias for backwards compatibility.
+    
+    DEPRECATED: Use AtomicClaimsExtractor directly.
+    This alias will be removed in v2.0.
+    """
 
-    pass
+    def __init__(self, config):
+        """Initialize with deprecation warning."""
+        import warnings
+        warnings.warn(
+            "MetadataExtractor is deprecated. Use AtomicClaimsExtractor instead.",
+            DeprecationWarning,
+            stacklevel=2
+        )
+        super().__init__(config)
 
 
 if __name__ == "__main__":

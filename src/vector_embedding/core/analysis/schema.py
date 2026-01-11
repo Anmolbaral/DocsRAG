@@ -16,17 +16,27 @@ __all__ = ["EvidencePointer", "AtomicClaim", "ClaimExtractionResult"]
 @dataclass
 class EvidencePointer:
     """
-    GPS coordinates for a claim's source evidence.
+    GPS coordinates for a claim's source evidence with span-level precision.
 
     Attributes:
         filename: Source document filename
         page: Page number where evidence appears (1-indexed)
-        text_hash: SHA256 hash of the source text block
+        start_char: Start character offset in page text (0-indexed)
+        end_char: End character offset in page text (exclusive)
+        quote: Exact text snippet that supports the claim
+        text_hash: SHA256 hash of the source page text (for change detection)
+        context_before: Optional text before the quote (for context)
+        context_after: Optional text after the quote (for context)
     """
 
     filename: str
     page: int
+    start_char: int
+    end_char: int
+    quote: str
     text_hash: str
+    context_before: str = ""
+    context_after: str = ""
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary."""
@@ -34,7 +44,27 @@ class EvidencePointer:
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "EvidencePointer":
-        """Create from dictionary."""
+        """
+        Create from dictionary with backward compatibility.
+        
+        Handles old format (page-level) and new format (span-level).
+        """
+        # Check if this is old format (missing span fields)
+        if 'start_char' not in data:
+            # Old format: page-level evidence only
+            # Use placeholder values for new fields
+            return cls(
+                filename=data['filename'],
+                page=data['page'],
+                start_char=0,
+                end_char=0,
+                quote="[Legacy claim - no span data]",
+                text_hash=data.get('text_hash', ''),
+                context_before="",
+                context_after=""
+            )
+        
+        # New format: has all span fields
         return cls(**data)
 
 
